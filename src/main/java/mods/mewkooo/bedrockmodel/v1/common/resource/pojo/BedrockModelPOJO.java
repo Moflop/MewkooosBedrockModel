@@ -36,4 +36,10 @@ public class BedrockModelPOJO {
         }
         return geometryModelNew[0];
     }
+
+    /** Display settings for the same geometry selected by {@link #getGeometryModelNew()}. */
+    public ItemDisplayTransforms getItemDisplayTransforms() {
+        GeometryModelNew geometry = getGeometryModelNew();
+        return geometry == null ? ItemDisplayTransforms.NONE : geometry.getItemDisplayTransforms();
+    }
 }

@@ -51,8 +51,10 @@ public class BedrockModel implements Skeleton, BoneIndexProvider {
      * 模型默认的 Pose
      */
     private final Pose bindingPose;
+    private final ItemDisplayTransforms itemDisplayTransforms;
 
     public BedrockModel(BedrockModelPOJO pojo) {
+        this.itemDisplayTransforms = pojo.getItemDisplayTransforms();
         if (BedrockVersion.isLegacyVersion(pojo)) {
             loadLegacyModel(pojo);
         }
@@ -203,6 +205,10 @@ public class BedrockModel implements Skeleton, BoneIndexProvider {
 
     public AABB getRenderBoundingBox() {
         return renderBoundingBox;
+    }
+
+    public ItemDisplayTransforms getItemDisplayTransforms() {
+        return itemDisplayTransforms;
     }
 
     public HashMap<String, BedrockBone> getBoneMap() {

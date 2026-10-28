@@ -13,12 +13,20 @@ public class GeometryModelNew {
     @NeedForRootMotion
     private BonesItem[] bones;
 
+    @SerializedName("item_display_transforms")
+    @ClientOnly
+    private ItemDisplayTransforms itemDisplayTransforms = ItemDisplayTransforms.NONE;
+
     public Description getDescription() {
         return description;
     }
 
     public BonesItem[] getBones() {
         return bones;
+    }
+
+    public ItemDisplayTransforms getItemDisplayTransforms() {
+        return itemDisplayTransforms == null ? ItemDisplayTransforms.NONE : itemDisplayTransforms;
     }
 
     public void deco() {

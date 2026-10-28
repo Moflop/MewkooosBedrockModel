@@ -2,6 +2,7 @@ package mods.mewkooo.bedrockmodel.v2.common.model.baked;
 
 import mods.mewkooo.bedrockmodel.v1.common.BoneIndexProvider;
 import mods.mewkooo.bedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
+import mods.mewkooo.bedrockmodel.v1.common.resource.pojo.ItemDisplayTransforms;
 import mods.mewkooo.bedrockmodel.v2.common.model.runtime.BakedModelInstance;
 import mods.mewkooo.bedrockmodel.v2.common.model.runtime.BoneState;
 import com.maydaymemory.mae.basic.Pose;
@@ -45,6 +46,7 @@ public class BakedBedrockModel implements BoneIndexProvider {
 
     private final Pose bindPose;
     private final AABB renderBoundingBox;
+    private final ItemDisplayTransforms itemDisplayTransforms;
 
 
     public BakedBedrockModel(BakedBoneDefinition[] bones, Map<String, Integer> boneIndexByName, BakedGeometryChunk[] chunks,
@@ -60,6 +62,15 @@ public class BakedBedrockModel implements BoneIndexProvider {
                              BoneLocator[] locators, Map<String, BoneLocator> locatorByName,
                              QueryTransform[] queryTransforms, Map<String, QueryTransform> queryTransformByName,
                              Pose bindPose, AABB renderBoundingBox) {
+        this(bones, boneIndexByName, chunks, cubeGeometry, retainsCubeGeometry, locators, locatorByName,
+                queryTransforms, queryTransformByName, bindPose, renderBoundingBox, ItemDisplayTransforms.NONE);
+    }
+
+    public BakedBedrockModel(BakedBoneDefinition[] bones, Map<String, Integer> boneIndexByName, BakedGeometryChunk[] chunks,
+                             BakedCubeGeometry[] cubeGeometry, boolean retainsCubeGeometry,
+                             BoneLocator[] locators, Map<String, BoneLocator> locatorByName,
+                             QueryTransform[] queryTransforms, Map<String, QueryTransform> queryTransformByName,
+                             Pose bindPose, AABB renderBoundingBox, ItemDisplayTransforms itemDisplayTransforms) {
         this.bones = bones.clone();
         this.boneIndexByName = Map.copyOf(boneIndexByName);
         this.chunks = chunks.clone();
@@ -74,6 +85,7 @@ public class BakedBedrockModel implements BoneIndexProvider {
         this.queryTransformByName = Map.copyOf(queryTransformByName);
         this.bindPose = bindPose;
         this.renderBoundingBox = renderBoundingBox;
+        this.itemDisplayTransforms = Objects.requireNonNull(itemDisplayTransforms, "itemDisplayTransforms");
     }
 
     public static BakedBedrockModel bake(BedrockModelPOJO pojo) {
@@ -133,6 +145,10 @@ public class BakedBedrockModel implements BoneIndexProvider {
 
     public AABB getRenderBoundingBox() {
         return renderBoundingBox;
+    }
+
+    public ItemDisplayTransforms getItemDisplayTransforms() {
+        return itemDisplayTransforms;
     }
 
     public Pose getBindPose() {

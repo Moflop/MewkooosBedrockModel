@@ -34,7 +34,8 @@ public class TreeBedrockModelBaker {
     public static TreeBedrockModel bake(BedrockModelPOJO pojo) {
         ModelSource source = modelSource(pojo);
         if (source.bones == null || source.bones.length == 0) {
-            return new TreeBedrockModel(new TreeBoneDefinition[0], Map.of(), Map.of(), new ArrayPoseBuilder().toPose(), source.renderBoundingBox);
+            return new TreeBedrockModel(new TreeBoneDefinition[0], Map.of(), Map.of(), new ArrayPoseBuilder().toPose(),
+                    source.renderBoundingBox, pojo.getItemDisplayTransforms());
         }
         CompileBone[] compileBones = createCompileBones(source.bones);
         Map<String, CompileBone> boneByName = indexCompileBones(compileBones);
@@ -49,7 +50,8 @@ public class TreeBedrockModelBaker {
                 locatorByName.put(locator.getKey(), TreeBedrockModel.locatorEntry(definition.index(), locator.getValue()));
             }
         }
-        return new TreeBedrockModel(definitions, indexByName, locatorByName, createBindPose(definitions), source.renderBoundingBox);
+        return new TreeBedrockModel(definitions, indexByName, locatorByName, createBindPose(definitions),
+                source.renderBoundingBox, pojo.getItemDisplayTransforms());
     }
 
     private static TreeBoneDefinition[] createDefinitions(BonesItem[] sourceBones, CompileBone[] compileBones, int texWidth, int texHeight) {

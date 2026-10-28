@@ -29,7 +29,8 @@ public class BedrockModelBaker {
         ModelSource source = modelSource(pojo);
         if (source.bones == null || source.bones.length == 0) {
             return new BakedBedrockModel(new BakedBoneDefinition[0], Map.of(), new BakedGeometryChunk[0], new BakedCubeGeometry[0], options.retainCubeGeometry(),
-                    new BoneLocator[0], Map.of(), new QueryTransform[0], Map.of(), new ArrayPoseBuilder().toPose(), source.renderBoundingBox);
+                    new BoneLocator[0], Map.of(), new QueryTransform[0], Map.of(), new ArrayPoseBuilder().toPose(), source.renderBoundingBox,
+                    pojo.getItemDisplayTransforms());
         }
 
         Map<String, CompileBone> compileBones = createCompileBones(source.bones);
@@ -52,7 +53,8 @@ public class BedrockModelBaker {
 
         return new BakedBedrockModel(bakedBoneDefinitions, runtimeIndex.indexByName, bakeResult.chunks(),
                 bakeResult.cubeGeometry(), options.retainCubeGeometry(), locatorResult.locators, locatorResult.locatorByName,
-                queryResult.queryTransforms, queryResult.queryTransformByName, bindPose, source.renderBoundingBox);
+                queryResult.queryTransforms, queryResult.queryTransformByName, bindPose, source.renderBoundingBox,
+                pojo.getItemDisplayTransforms());
     }
 
     private static ModelSource modelSource(BedrockModelPOJO pojo) {

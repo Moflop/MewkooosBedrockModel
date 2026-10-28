@@ -3,6 +3,7 @@ package mods.mewkooo.bedrockmodel.v2.common.model.tree;
 import mods.mewkooo.bedrockmodel.v1.common.BoneIndexProvider;
 import mods.mewkooo.bedrockmodel.v1.common.model.LocatorData;
 import mods.mewkooo.bedrockmodel.v1.common.resource.pojo.BedrockModelPOJO;
+import mods.mewkooo.bedrockmodel.v1.common.resource.pojo.ItemDisplayTransforms;
 import mods.mewkooo.bedrockmodel.v2.client.compat.acceleratedrendering.AcceleratedRenderingCompat;
 import mods.mewkooo.bedrockmodel.v2.common.model.runtime.BoneState;
 import mods.mewkooo.bedrockmodel.v2.common.model.runtime.TreeModelInstance;
@@ -22,6 +23,7 @@ import org.joml.Quaternionf;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Objects;
 
 public class TreeBedrockModel implements BoneIndexProvider {
     private static final int MAX_LIGHT_TEXTURE = LightTexture.pack(15, 15);
@@ -31,10 +33,17 @@ public class TreeBedrockModel implements BoneIndexProvider {
     private final Map<String, Map.Entry<Integer, LocatorData>> locatorByName;
     private final Pose bindPose;
     private final AABB renderBoundingBox;
+    private final ItemDisplayTransforms itemDisplayTransforms;
 
     public TreeBedrockModel(TreeBoneDefinition[] bones, Map<String, Integer> boneIndexByName,
                             Map<String, Map.Entry<Integer, LocatorData>> locatorByName, Pose bindPose,
                             AABB renderBoundingBox) {
+        this(bones, boneIndexByName, locatorByName, bindPose, renderBoundingBox, ItemDisplayTransforms.NONE);
+    }
+
+    public TreeBedrockModel(TreeBoneDefinition[] bones, Map<String, Integer> boneIndexByName,
+                            Map<String, Map.Entry<Integer, LocatorData>> locatorByName, Pose bindPose,
+                            AABB renderBoundingBox, ItemDisplayTransforms itemDisplayTransforms) {
         this.bones = bones;
         for (TreeBoneDefinition bone : bones) {
             bone.linkReferences(bones);
@@ -43,6 +52,7 @@ public class TreeBedrockModel implements BoneIndexProvider {
         this.locatorByName = Map.copyOf(locatorByName);
         this.bindPose = bindPose;
         this.renderBoundingBox = renderBoundingBox;
+        this.itemDisplayTransforms = Objects.requireNonNull(itemDisplayTransforms, "itemDisplayTransforms");
     }
 
     public static TreeBedrockModel bake(BedrockModelPOJO pojo) {
@@ -67,6 +77,10 @@ public class TreeBedrockModel implements BoneIndexProvider {
 
     public AABB getRenderBoundingBox() {
         return renderBoundingBox;
+    }
+
+    public ItemDisplayTransforms getItemDisplayTransforms() {
+        return itemDisplayTransforms;
     }
 
     public Pose getBindPose() {
