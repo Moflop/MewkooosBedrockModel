@@ -13,6 +13,11 @@ import java.util.Objects;
  * Unspecified translation, rotation and scale stay null because their defaults depend on the display context.
  */
 public final class ItemDisplayTransform {
+    /** Neutral transform with unit scale and GUI auto-fitting disabled. */
+    public static final ItemDisplayTransform NONE = new ItemDisplayTransform(
+            new Vector3f(), new Vector3f(), new Vector3f(1),
+            new Vector3f(), new Vector3f(), false);
+
     @Nullable
     private final Vector3f rotation;
     @Nullable
