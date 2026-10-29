@@ -9,7 +9,7 @@ plugins {
 
 version = mod_version
 group = mod_group_id
-archivesBaseName = 'simplebedrockmodel'
+archivesBaseName = 'mewkooos_bedrock_model'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
