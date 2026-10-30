@@ -1,0 +1,7 @@
+package mods.mewkooo.bedrockmodel.core.particle.data.component.rate;
+
+import mods.mewkooo.bedrockmodel.core.particle.data.component.IEmitterComponentDefinition;
+
+/** 标记接口：所有 rate 组件实现此接口 */
+public interface RateComponent extends IEmitterComponentDefinition {}
+

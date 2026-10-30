@@ -1,6 +1,6 @@
 # 显示变换解析
 
-模型加载时会读取基岩版几何文件的 `item_display_transforms`，并在 `legacy.model.BedrockModel`、`model.tree.TreeBedrockModel` 和 `model.baked.BakedBedrockModel` 上通过 `getItemDisplayTransforms()` 暴露。该 API 保存显示参数，调用方负责选择视角、处理默认值并应用渲染变换。
+模型加载时会读取基岩版几何文件的 `item_display_transforms`，并在 `client.legacy.model.BedrockModel`、`core.model.tree.TreeBedrockModel` 和 `core.model.baked.BakedBedrockModel` 上通过 `getItemDisplayTransforms()` 暴露。该 API 保存显示参数，调用方负责选择视角、处理默认值并应用渲染变换。
 
 ## JSON 位置
 
@@ -45,8 +45,8 @@
 以已加载的 `TreeBedrockModel model` 为例，另外两种模型使用相同的入口：
 
 ```java
-import mods.mewkooo.bedrockmodel.resource.json.pojo.ItemDisplayTransform;
-import mods.mewkooo.bedrockmodel.resource.json.pojo.ItemDisplayTransforms;
+import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransform;
+import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransforms;
 import net.minecraft.world.item.ItemDisplayContext;
 import org.joml.Vector3f;
 
@@ -79,7 +79,7 @@ if (gui != null) {
 
 ```java
 import mods.mewkooo.bedrockmodel.client.legacy.renderer.BedrockDisplayTransforms;
-import mods.mewkooo.bedrockmodel.resource.json.pojo.ItemDisplayTransform;
+import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransform;
 
 BedrockDisplayTransforms.applyDisplayTransform(
         poseStack, model.getItemDisplayTransforms(), context,

@@ -1,7 +1,7 @@
 package mods.mewkooo.bedrockmodel.client.legacy.compat.embeddium;
 
 
-import mods.mewkooo.bedrockmodel.legacy.model.BedrockCubeBox;
+import mods.mewkooo.bedrockmodel.client.legacy.model.BedrockCubeBox;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;

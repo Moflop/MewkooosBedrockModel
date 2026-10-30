@@ -1,7 +1,7 @@
 package mods.mewkooo.bedrockmodel.client.compat.acceleratedrendering;
 
-import mods.mewkooo.bedrockmodel.model.baked.BakedGeometryChunk;
-import mods.mewkooo.bedrockmodel.model.tree.TreeBoneDefinition;
+import mods.mewkooo.bedrockmodel.core.model.baked.BakedGeometryChunk;
+import mods.mewkooo.bedrockmodel.core.model.tree.TreeBoneDefinition;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.neoforged.api.distmarker.Dist;

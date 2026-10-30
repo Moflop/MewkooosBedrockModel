@@ -1,8 +1,8 @@
 package mods.mewkooo.bedrockmodel.client.legacy.renderer;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import mods.mewkooo.bedrockmodel.resource.json.pojo.ItemDisplayTransform;
-import mods.mewkooo.bedrockmodel.resource.json.pojo.ItemDisplayTransforms;
+import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransform;
+import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransforms;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;

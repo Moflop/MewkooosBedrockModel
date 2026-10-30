@@ -1,11 +1,11 @@
 package mods.mewkooo.bedrockmodel.client.compat.embeddium;
 
 import mods.mewkooo.bedrockmodel.client.legacy.compat.embeddium.IEmbeddiumVertexWriter;
-import mods.mewkooo.bedrockmodel.model.geometry.CubeFaceLayout;
-import mods.mewkooo.bedrockmodel.model.tree.CubeBox;
-import mods.mewkooo.bedrockmodel.model.tree.CubePerFace;
-import mods.mewkooo.bedrockmodel.model.tree.ICube;
-import mods.mewkooo.bedrockmodel.model.tree.PolyMesh;
+import mods.mewkooo.bedrockmodel.core.model.geometry.CubeFaceLayout;
+import mods.mewkooo.bedrockmodel.core.model.tree.CubeBox;
+import mods.mewkooo.bedrockmodel.core.model.tree.CubePerFace;
+import mods.mewkooo.bedrockmodel.core.model.tree.ICube;
+import mods.mewkooo.bedrockmodel.core.model.tree.PolyMesh;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.embeddedt.embeddium.api.vertex.buffer.VertexBufferWriter;

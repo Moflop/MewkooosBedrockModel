@@ -8,9 +8,9 @@ import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.renderer
 import com.github.argon4w.acceleratedrendering.core.meshes.IMesh;
 import com.github.argon4w.acceleratedrendering.core.meshes.collectors.CulledMeshCollector;
 import com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityRenderingFeature;
-import mods.mewkooo.bedrockmodel.legacy.model.BedrockBone;
-import mods.mewkooo.bedrockmodel.legacy.model.BedrockCube;
-import mods.mewkooo.bedrockmodel.legacy.model.BedrockMesh;
+import mods.mewkooo.bedrockmodel.client.legacy.model.BedrockBone;
+import mods.mewkooo.bedrockmodel.client.legacy.model.BedrockCube;
+import mods.mewkooo.bedrockmodel.client.legacy.model.BedrockMesh;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.util.FastColor;

@@ -8,11 +8,11 @@ import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.renderer
 import com.github.argon4w.acceleratedrendering.core.meshes.IMesh;
 import com.github.argon4w.acceleratedrendering.core.meshes.collectors.CulledMeshCollector;
 import com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityRenderingFeature;
-import mods.mewkooo.bedrockmodel.model.baked.BakedGeometryChunk;
-import mods.mewkooo.bedrockmodel.model.baked.BakedQuadData;
-import mods.mewkooo.bedrockmodel.model.baked.BakedVertexData;
-import mods.mewkooo.bedrockmodel.model.tree.TreeBoneDefinition;
-import mods.mewkooo.bedrockmodel.model.tree.TreeGeometryWriter;
+import mods.mewkooo.bedrockmodel.core.model.baked.BakedGeometryChunk;
+import mods.mewkooo.bedrockmodel.core.model.baked.BakedQuadData;
+import mods.mewkooo.bedrockmodel.core.model.baked.BakedVertexData;
+import mods.mewkooo.bedrockmodel.core.model.tree.TreeBoneDefinition;
+import mods.mewkooo.bedrockmodel.client.model.render.TreeGeometryWriter;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.util.FastColor;
@@ -23,11 +23,17 @@ import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
 import java.util.Map;
+import java.util.Collections;
+import java.util.WeakHashMap;
 
 @OnlyIn(Dist.CLIENT)
 public final class AcceleratedRenderer {
     private static final Matrix4f IDENTITY_TRANSFORM = new Matrix4f();
     private static final Matrix3f IDENTITY_NORMAL = new Matrix3f();
+    private static final Map<BakedGeometryChunk, AcceleratedBedrockGeometryCache> CHUNK_CACHES =
+            Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<TreeBoneDefinition, AcceleratedBedrockGeometryCache> BONE_CACHES =
+            Collections.synchronizedMap(new WeakHashMap<>());
 
     private final IAcceleratedRenderer<BakedGeometryChunk> cachedQuadRenderer = this::renderCachedQuads;
     private final IAcceleratedRenderer<BakedGeometryChunk> cachedVertexRenderer = this::renderCachedVertices;
@@ -81,7 +87,7 @@ public final class AcceleratedRenderer {
     private void renderCachedQuads(VertexConsumer vertexConsumer, BakedGeometryChunk chunk, Matrix4f transform, Matrix3f normal,
                                    int lightmap, int overlay, int color) {
         IAcceleratedVertexConsumer extension = VertexConsumerExtension.getAccelerated(vertexConsumer);
-        Map<IBufferGraph, IMesh> meshCache = chunk.getOrCreateCache().quadMeshes;
+        Map<IBufferGraph, IMesh> meshCache = chunkCache(chunk).quadMeshes;
         IMesh mesh = meshCache.get(extension);
 
         extension.beginTransform(transform, normal);
@@ -100,7 +106,7 @@ public final class AcceleratedRenderer {
     private void renderCachedVertices(VertexConsumer vertexConsumer, BakedGeometryChunk chunk, Matrix4f transform, Matrix3f normal,
                                       int lightmap, int overlay, int color) {
         IAcceleratedVertexConsumer extension = VertexConsumerExtension.getAccelerated(vertexConsumer);
-        Map<IBufferGraph, IMesh> meshCache = chunk.getOrCreateCache().triangleMeshes;
+        Map<IBufferGraph, IMesh> meshCache = chunkCache(chunk).triangleMeshes;
         IMesh mesh = meshCache.get(extension);
 
         extension.beginTransform(transform, normal);
@@ -119,7 +125,7 @@ public final class AcceleratedRenderer {
     private void renderCachedCubes(VertexConsumer vertexConsumer, TreeBoneDefinition bone, Matrix4f transform, Matrix3f normal,
                                    int lightmap, int overlay, int color) {
         IAcceleratedVertexConsumer extension = VertexConsumerExtension.getAccelerated(vertexConsumer);
-        Map<IBufferGraph, IMesh> meshCache = bone.getOrCreateCache().quadMeshes;
+        Map<IBufferGraph, IMesh> meshCache = boneCache(bone).quadMeshes;
         IMesh mesh = meshCache.get(extension);
 
         extension.beginTransform(transform, normal);
@@ -138,7 +144,7 @@ public final class AcceleratedRenderer {
     private void renderCachedPolyMeshes(VertexConsumer vertexConsumer, TreeBoneDefinition bone, Matrix4f transform, Matrix3f normal,
                                         int lightmap, int overlay, int color) {
         IAcceleratedVertexConsumer extension = VertexConsumerExtension.getAccelerated(vertexConsumer);
-        Map<IBufferGraph, IMesh> meshCache = bone.getOrCreateCache().triangleMeshes;
+        Map<IBufferGraph, IMesh> meshCache = boneCache(bone).triangleMeshes;
         IMesh mesh = meshCache.get(extension);
 
         extension.beginTransform(transform, normal);
@@ -152,6 +158,18 @@ public final class AcceleratedRenderer {
         }
         mesh.write(extension, color, lightmap, overlay);
         extension.endTransform();
+    }
+
+    private static AcceleratedBedrockGeometryCache chunkCache(BakedGeometryChunk chunk) {
+        synchronized (CHUNK_CACHES) {
+            return CHUNK_CACHES.computeIfAbsent(chunk, ignored -> new AcceleratedBedrockGeometryCache());
+        }
+    }
+
+    private static AcceleratedBedrockGeometryCache boneCache(TreeBoneDefinition bone) {
+        synchronized (BONE_CACHES) {
+            return BONE_CACHES.computeIfAbsent(bone, ignored -> new AcceleratedBedrockGeometryCache());
+        }
     }
 
     private void emitQuads(VertexConsumer builder, BakedQuadData quads) {

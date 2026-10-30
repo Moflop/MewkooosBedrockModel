@@ -1,6 +1,6 @@
 package mods.mewkooo.bedrockmodel.client.legacy.animation;
 
-import mods.mewkooo.bedrockmodel.animation.time.AnimationClock;
+import mods.mewkooo.bedrockmodel.api.animation.time.AnimationClock;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;

@@ -1,6 +1,6 @@
 package mods.mewkooo.bedrockmodel.client.legacy.compat.acceleratedrendering;
 
-import mods.mewkooo.bedrockmodel.legacy.model.BedrockBone;
+import mods.mewkooo.bedrockmodel.client.legacy.model.BedrockBone;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.neoforged.api.distmarker.Dist;

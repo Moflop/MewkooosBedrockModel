@@ -1,7 +1,7 @@
 package mods.mewkooo.bedrockmodel.client.legacy.compat.sodium;
 
-import mods.mewkooo.bedrockmodel.legacy.model.BedrockCubePerFace;
-import mods.mewkooo.bedrockmodel.resource.json.pojo.FaceUVsItem;
+import mods.mewkooo.bedrockmodel.client.legacy.model.BedrockCubePerFace;
+import mods.mewkooo.bedrockmodel.core.json.pojo.FaceUVsItem;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;

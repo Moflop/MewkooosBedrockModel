@@ -1,7 +1,7 @@
 package mods.mewkooo.bedrockmodel.client.legacy.event;
 
 import mods.mewkooo.bedrockmodel.BedrockModelMod;
-import mods.mewkooo.bedrockmodel.animation.time.AnimationClock;
+import mods.mewkooo.bedrockmodel.api.animation.time.AnimationClock;
 import mods.mewkooo.bedrockmodel.client.legacy.animation.PausedClientAnimationClock;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;

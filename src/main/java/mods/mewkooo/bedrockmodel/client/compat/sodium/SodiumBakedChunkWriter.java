@@ -1,8 +1,8 @@
 package mods.mewkooo.bedrockmodel.client.compat.sodium;
 
 import mods.mewkooo.bedrockmodel.client.legacy.compat.sodium.ISodiumVertexWriter;
-import mods.mewkooo.bedrockmodel.model.baked.BakedGeometryChunk;
-import mods.mewkooo.bedrockmodel.model.baked.BakedQuadData;
+import mods.mewkooo.bedrockmodel.core.model.baked.BakedGeometryChunk;
+import mods.mewkooo.bedrockmodel.core.model.baked.BakedQuadData;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;

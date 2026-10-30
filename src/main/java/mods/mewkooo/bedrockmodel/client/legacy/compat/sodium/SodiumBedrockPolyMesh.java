@@ -1,8 +1,8 @@
 package mods.mewkooo.bedrockmodel.client.legacy.compat.sodium;
 
-import mods.mewkooo.bedrockmodel.legacy.model.BedrockBone;
-import mods.mewkooo.bedrockmodel.legacy.model.BedrockPolyMesh;
-import mods.mewkooo.bedrockmodel.resource.json.pojo.PolyMeshItem;
+import mods.mewkooo.bedrockmodel.client.legacy.model.BedrockBone;
+import mods.mewkooo.bedrockmodel.client.legacy.model.BedrockPolyMesh;
+import mods.mewkooo.bedrockmodel.core.json.pojo.PolyMeshItem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 

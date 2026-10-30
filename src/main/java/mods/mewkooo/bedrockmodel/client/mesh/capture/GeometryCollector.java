@@ -3,7 +3,10 @@ package mods.mewkooo.bedrockmodel.client.mesh.capture;
 import mods.mewkooo.bedrockmodel.client.mesh.render.EmissiveMeshRenderTypes;
 
 import mods.mewkooo.bedrockmodel.client.legacy.renderer.BedrockModelRenderTypes;
-import mods.mewkooo.bedrockmodel.resource.BedrockModelRepository;
+import mods.mewkooo.bedrockmodel.api.resource.BedrockModelResource;
+import mods.mewkooo.bedrockmodel.api.resource.BedrockResources;
+import mods.mewkooo.bedrockmodel.api.model.ModelType;
+import mods.mewkooo.bedrockmodel.core.model.tree.TreeBedrockModel;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
@@ -12,6 +15,7 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.fml.LogicalSide;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -61,17 +65,19 @@ public class GeometryCollector {
 
     /** 便捷捕获 SBM 方块树模型：绑定姿势、局部平移 (0.5,0,0.5)、应用朝向，自动收集两种拓扑。 */
     public boolean blockModel(ResourceLocation modelId, ResourceLocation texture, Direction facing) {
-        var model = BedrockModelRepository.getInstance().getTreeModel(modelId);
-        if (model == null) return false;
+        var access = BedrockResources.models(LogicalSide.CLIENT);
+        if (access == null) return false;
+        BedrockModelResource resource = access.getResource(modelId);
+        if (resource == null || resource.kind() != ModelType.TREE || !(resource.model() instanceof TreeBedrockModel model)) return false;
         PoseStack pose = new PoseStack();
         pose.translate(0.5, 0, 0.5);
         pose.mulPose(Axis.YP.rotationDegrees(-facing.toYRot()));
         var instance = model.createInstance();
         instance.resetPose();
-        model.renderBoneTree(instance, pose, buffer(RenderType.entityCutout(texture),
+        mods.mewkooo.bedrockmodel.client.model.render.TreeModelRenderer.renderBoneTree(instance, pose, buffer(RenderType.entityCutout(texture),
                         EmissiveMeshRenderTypes.cutout(texture, VertexFormat.Mode.QUADS), VertexFormat.Mode.QUADS),
                 0, OverlayTexture.NO_OVERLAY, 1, 1, 1, 1, true);
-        model.renderBoneTree(instance, pose, buffer(BedrockModelRenderTypes.polyMeshCutout(texture),
+        mods.mewkooo.bedrockmodel.client.model.render.TreeModelRenderer.renderBoneTree(instance, pose, buffer(BedrockModelRenderTypes.polyMeshCutout(texture),
                         EmissiveMeshRenderTypes.cutout(texture, VertexFormat.Mode.TRIANGLES), VertexFormat.Mode.TRIANGLES),
                 0, OverlayTexture.NO_OVERLAY, 1, 1, 1, 1, false);
         return true;

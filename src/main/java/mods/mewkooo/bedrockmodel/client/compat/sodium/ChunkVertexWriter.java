@@ -1,6 +1,6 @@
 package mods.mewkooo.bedrockmodel.client.compat.sodium;
 
-import mods.mewkooo.bedrockmodel.model.baked.BakedGeometryChunk;
+import mods.mewkooo.bedrockmodel.core.model.baked.BakedGeometryChunk;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
