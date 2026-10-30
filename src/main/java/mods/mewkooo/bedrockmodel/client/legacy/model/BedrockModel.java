@@ -1,6 +1,6 @@
 package mods.mewkooo.bedrockmodel.client.legacy.model;
 
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransforms;
+import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransforms;
 
 import mods.mewkooo.bedrockmodel.core.model.LocatorData;
 import mods.mewkooo.bedrockmodel.client.legacy.compat.embeddium.EmbeddiumBedrockCubeBox;
@@ -12,6 +12,7 @@ import mods.mewkooo.bedrockmodel.client.legacy.compat.sodium.SodiumCompat;
 import mods.mewkooo.bedrockmodel.client.legacy.renderer.BedrockModelRenderTypes;
 import mods.mewkooo.bedrockmodel.api.model.ModelType;
 import mods.mewkooo.bedrockmodel.core.json.pojo.*;
+import mods.mewkooo.bedrockmodel.core.json.mapping.ItemDisplayTransformsMapper;
 import com.google.common.collect.Collections2;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -57,7 +58,7 @@ public class BedrockModel implements Skeleton, mods.mewkooo.bedrockmodel.api.mod
     private final ItemDisplayTransforms itemDisplayTransforms;
 
     public BedrockModel(BedrockModelPOJO pojo) {
-        this.itemDisplayTransforms = pojo.getItemDisplayTransforms();
+        this.itemDisplayTransforms = ItemDisplayTransformsMapper.toApi(pojo.getItemDisplayTransformsData());
         if (BedrockVersion.isLegacyVersion(pojo)) {
             loadLegacyModel(pojo);
         }

@@ -1,7 +1,5 @@
 package mods.mewkooo.bedrockmodel.core.json.pojo;
 
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransforms;
-
 import mods.mewkooo.bedrockmodel.core.json.exclusion.NeedForRootMotion;
 import com.google.gson.annotations.SerializedName;
 
@@ -39,10 +37,10 @@ public class BedrockModelPOJO {
         return geometryModelNew[0];
     }
 
-    /** Display settings for the same geometry selected by {@link #getGeometryModelNew()}. */
-    public ItemDisplayTransforms getItemDisplayTransforms() {
+    /** Parsed display fields for the same geometry selected by {@link #getGeometryModelNew()}. */
+    public ItemDisplayTransformsData getItemDisplayTransformsData() {
         GeometryModelNew geometry = getGeometryModelNew();
-        return geometry == null ? ItemDisplayTransforms.NONE : geometry.getItemDisplayTransforms();
+        return geometry == null ? ItemDisplayTransformsData.NONE : geometry.getItemDisplayTransformsData();
     }
 }
 

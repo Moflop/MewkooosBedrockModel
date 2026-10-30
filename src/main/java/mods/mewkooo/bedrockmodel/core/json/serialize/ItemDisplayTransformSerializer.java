@@ -6,16 +6,18 @@ import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
 import com.google.gson.JsonSyntaxException;
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransform;
+import mods.mewkooo.bedrockmodel.core.json.pojo.ItemDisplayTransformData;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
 
 import java.lang.reflect.Type;
 
-public class ItemDisplayTransformSerializer implements JsonDeserializer<ItemDisplayTransform> {
+public class ItemDisplayTransformSerializer implements JsonDeserializer<ItemDisplayTransformData>, JsonSerializer<ItemDisplayTransformData> {
     @Override
-    public ItemDisplayTransform deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
+    public ItemDisplayTransformData deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
             throws JsonParseException {
         if (!json.isJsonObject()) {
             throw new JsonSyntaxException("Expected item display transform to be an object");
@@ -34,9 +36,33 @@ public class ItemDisplayTransformSerializer implements JsonDeserializer<ItemDisp
             }
             fitToFrame = fit.getAsBoolean();
         }
-        return new ItemDisplayTransform(rotation, translation, scale,
+        return new ItemDisplayTransformData(rotation, translation, scale,
                 rotationPivot == null ? new Vector3f() : rotationPivot,
                 scalePivot == null ? new Vector3f() : scalePivot, fitToFrame);
+    }
+
+    @Override
+    public JsonElement serialize(ItemDisplayTransformData transform, Type typeOfSrc,
+                                 JsonSerializationContext context) {
+        JsonObject object = new JsonObject();
+        writeVector(object, "rotation", transform.rotation());
+        writeVector(object, "translation", transform.translation());
+        writeVector(object, "scale", transform.scale());
+        writeVector(object, "rotation_pivot", transform.rotationPivot());
+        writeVector(object, "scale_pivot", transform.scalePivot());
+        object.addProperty("fit_to_frame", transform.fitToFrame());
+        return object;
+    }
+
+    private static void writeVector(JsonObject object, String name, @Nullable Vector3f vector) {
+        if (vector == null) {
+            return;
+        }
+        JsonArray array = new JsonArray();
+        array.add(vector.x);
+        array.add(vector.y);
+        array.add(vector.z);
+        object.add(name, array);
     }
 
     @Nullable

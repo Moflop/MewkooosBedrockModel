@@ -3,8 +3,10 @@ package mods.mewkooo.bedrockmodel.core.model;
 import mods.mewkooo.bedrockmodel.client.legacy.model.BedrockModel;
 import mods.mewkooo.bedrockmodel.core.json.GsonUtil;
 import mods.mewkooo.bedrockmodel.core.json.pojo.BedrockModelPOJO;
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransform;
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransforms;
+import mods.mewkooo.bedrockmodel.core.json.pojo.ItemDisplayTransformsData;
+import mods.mewkooo.bedrockmodel.core.json.mapping.ItemDisplayTransformsMapper;
+import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransform;
+import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransforms;
 import mods.mewkooo.bedrockmodel.core.model.baked.BakedBedrockModel;
 import mods.mewkooo.bedrockmodel.core.model.tree.TreeBedrockModel;
 import org.joml.Vector3f;
@@ -64,12 +66,12 @@ class ItemDisplayTransformsIntegrationTest {
         assertEquals(1, pojo.getGeometryModelNew().getBones().length);
         assertEquals("root", pojo.getGeometryModelNew().getBones()[0].getName());
         assertArrayEquals(new float[]{1, 2, 3}, pojo.getGeometryModelNew().getBones()[0].getPivot());
-        assertSame(ItemDisplayTransforms.NONE, pojo.getItemDisplayTransforms());
+        assertSame(ItemDisplayTransformsData.NONE, pojo.getItemDisplayTransformsData());
         assertModelsHaveNoDisplayTransforms(pojo);
     }
 
     private static void assertModelsPreserveDisplayTransforms(BedrockModelPOJO pojo) {
-        assertGuiTransform(pojo.getItemDisplayTransforms());
+        assertGuiTransform(ItemDisplayTransformsMapper.toApi(pojo.getItemDisplayTransformsData()));
         assertGuiTransform(new BedrockModel(pojo).getItemDisplayTransforms());
         assertGuiTransform(TreeBedrockModel.bake(pojo).getItemDisplayTransforms());
         assertGuiTransform(BakedBedrockModel.bake(pojo).getItemDisplayTransforms());
@@ -88,7 +90,7 @@ class ItemDisplayTransformsIntegrationTest {
     }
 
     private static void assertModelsHaveNoDisplayTransforms(BedrockModelPOJO pojo) {
-        assertTrue(pojo.getItemDisplayTransforms().getTransforms().isEmpty());
+        assertTrue(pojo.getItemDisplayTransformsData().transforms().isEmpty());
         assertTrue(new BedrockModel(pojo).getItemDisplayTransforms().getTransforms().isEmpty());
         assertTrue(TreeBedrockModel.bake(pojo).getItemDisplayTransforms().getTransforms().isEmpty());
         assertTrue(BakedBedrockModel.bake(pojo).getItemDisplayTransforms().getTransforms().isEmpty());

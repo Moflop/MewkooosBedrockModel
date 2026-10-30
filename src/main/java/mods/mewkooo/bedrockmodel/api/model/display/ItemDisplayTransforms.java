@@ -1,4 +1,4 @@
-package mods.mewkooo.bedrockmodel.api.json;
+package mods.mewkooo.bedrockmodel.api.model.display;
 
 import net.minecraft.world.item.ItemDisplayContext;
 import org.jetbrains.annotations.Nullable;

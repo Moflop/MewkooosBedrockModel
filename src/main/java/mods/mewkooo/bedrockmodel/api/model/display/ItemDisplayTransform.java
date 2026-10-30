@@ -1,6 +1,5 @@
-package mods.mewkooo.bedrockmodel.api.json;
+package mods.mewkooo.bedrockmodel.api.model.display;
 
-import com.google.gson.annotations.SerializedName;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
@@ -8,8 +7,7 @@ import org.joml.Vector3fc;
 import java.util.Objects;
 
 /**
- * Immutable display overrides, preserving JSON values without coordinate or unit conversion.
- * Translation uses pixels and rotation uses degrees.
+ * Immutable display overrides for a model. Translation uses Bedrock geometry pixels and rotation uses degrees.
  * Unspecified translation, rotation and scale stay null because their defaults depend on the display context.
  */
 public final class ItemDisplayTransform {
@@ -24,11 +22,8 @@ public final class ItemDisplayTransform {
     private final Vector3f translation;
     @Nullable
     private final Vector3f scale;
-    @SerializedName("rotation_pivot")
     private final Vector3f rotationPivot;
-    @SerializedName("scale_pivot")
     private final Vector3f scalePivot;
-    @SerializedName("fit_to_frame")
     private final boolean fitToFrame;
 
     public ItemDisplayTransform(@Nullable Vector3fc rotation, @Nullable Vector3fc translation,

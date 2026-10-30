@@ -1,6 +1,6 @@
 package mods.mewkooo.bedrockmodel.api.resource;
 
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransforms;
+import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransforms;
 import mods.mewkooo.bedrockmodel.api.model.BedrockModel;
 import mods.mewkooo.bedrockmodel.api.model.ModelType;
 import net.minecraft.world.phys.AABB;

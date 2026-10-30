@@ -1,6 +1,6 @@
 package mods.mewkooo.bedrockmodel.api.model;
 
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransforms;
+import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransforms;
 import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 

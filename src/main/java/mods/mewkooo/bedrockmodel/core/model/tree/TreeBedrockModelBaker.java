@@ -2,6 +2,7 @@ package mods.mewkooo.bedrockmodel.core.model.tree;
 
 import mods.mewkooo.bedrockmodel.core.model.LocatorData;
 import mods.mewkooo.bedrockmodel.core.json.pojo.*;
+import mods.mewkooo.bedrockmodel.core.json.mapping.ItemDisplayTransformsMapper;
 import mods.mewkooo.bedrockmodel.core.json.pojo.*;
 import mods.mewkooo.bedrockmodel.core.model.baked.LocalCubeBounds;
 import com.google.gson.JsonArray;
@@ -35,7 +36,7 @@ public class TreeBedrockModelBaker {
         ModelSource source = modelSource(pojo);
         if (source.bones == null || source.bones.length == 0) {
             return new TreeBedrockModel(new TreeBoneDefinition[0], Map.of(), Map.of(), new ArrayPoseBuilder().toPose(),
-                    source.renderBoundingBox, pojo.getItemDisplayTransforms());
+                    source.renderBoundingBox, ItemDisplayTransformsMapper.toApi(pojo.getItemDisplayTransformsData()));
         }
         CompileBone[] compileBones = createCompileBones(source.bones);
         Map<String, CompileBone> boneByName = indexCompileBones(compileBones);
@@ -51,7 +52,7 @@ public class TreeBedrockModelBaker {
             }
         }
         return new TreeBedrockModel(definitions, indexByName, locatorByName, createBindPose(definitions),
-                source.renderBoundingBox, pojo.getItemDisplayTransforms());
+                source.renderBoundingBox, ItemDisplayTransformsMapper.toApi(pojo.getItemDisplayTransformsData()));
     }
 
     private static TreeBoneDefinition[] createDefinitions(BonesItem[] sourceBones, CompileBone[] compileBones, int texWidth, int texHeight) {

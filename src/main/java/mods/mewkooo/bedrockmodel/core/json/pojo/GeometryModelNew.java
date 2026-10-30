@@ -1,7 +1,5 @@
 package mods.mewkooo.bedrockmodel.core.json.pojo;
 
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransforms;
-
 import mods.mewkooo.bedrockmodel.core.json.exclusion.ClientOnly;
 import mods.mewkooo.bedrockmodel.core.json.exclusion.NeedForRootMotion;
 import com.google.gson.annotations.SerializedName;
@@ -17,7 +15,7 @@ public class GeometryModelNew {
 
     @SerializedName("item_display_transforms")
     @ClientOnly
-    private ItemDisplayTransforms itemDisplayTransforms = ItemDisplayTransforms.NONE;
+    private ItemDisplayTransformsData itemDisplayTransforms = ItemDisplayTransformsData.NONE;
 
     public Description getDescription() {
         return description;
@@ -27,8 +25,8 @@ public class GeometryModelNew {
         return bones;
     }
 
-    public ItemDisplayTransforms getItemDisplayTransforms() {
-        return itemDisplayTransforms == null ? ItemDisplayTransforms.NONE : itemDisplayTransforms;
+    public ItemDisplayTransformsData getItemDisplayTransformsData() {
+        return itemDisplayTransforms == null ? ItemDisplayTransformsData.NONE : itemDisplayTransforms;
     }
 
     public void deco() {

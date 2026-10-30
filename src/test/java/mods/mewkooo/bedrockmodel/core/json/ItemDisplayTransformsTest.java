@@ -4,8 +4,10 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 import mods.mewkooo.bedrockmodel.core.json.pojo.BedrockModelPOJO;
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransform;
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransforms;
+import mods.mewkooo.bedrockmodel.core.json.pojo.ItemDisplayTransformsData;
+import mods.mewkooo.bedrockmodel.core.json.mapping.ItemDisplayTransformsMapper;
+import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransform;
+import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransforms;
 import net.minecraft.world.item.ItemDisplayContext;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
@@ -72,7 +74,9 @@ class ItemDisplayTransformsTest {
         BedrockModelPOJO pojo = GsonUtil.CLIENT_GSON.fromJson(
                 "{\"format_version\":\"1.21.0\",\"minecraft:geometry\":[" + geometry + "]}", BedrockModelPOJO.class);
 
-        assertSame(ItemDisplayTransforms.NONE, pojo.getItemDisplayTransforms());
+        assertSame(ItemDisplayTransformsData.NONE, pojo.getItemDisplayTransformsData());
+        assertSame(ItemDisplayTransforms.NONE,
+                ItemDisplayTransformsMapper.toApi(pojo.getItemDisplayTransformsData()));
     }
 
     @Test
@@ -87,9 +91,12 @@ class ItemDisplayTransformsTest {
                 }
                 """, BedrockModelPOJO.class);
 
-        assertSame(pojo.getGeometryModelNew().getItemDisplayTransforms(), pojo.getItemDisplayTransforms());
-        assertEquals(new Vector3f(16, 0, 0), pojo.getItemDisplayTransforms().getTransform("gui").getTranslation());
-        assertNull(pojo.getItemDisplayTransforms().getTransform("head"));
+        ItemDisplayTransformsData parsed = pojo.getItemDisplayTransformsData();
+        assertSame(pojo.getGeometryModelNew().getItemDisplayTransformsData(), parsed);
+        ItemDisplayTransforms metadata = ItemDisplayTransformsMapper.toApi(parsed);
+        assertNotSame(parsed, metadata);
+        assertEquals(new Vector3f(16, 0, 0), metadata.getTransform("gui").getTranslation());
+        assertNull(metadata.getTransform("head"));
     }
 
     @Test
@@ -118,11 +125,11 @@ class ItemDisplayTransformsTest {
 
     @Test
     void gsonRoundTripKeepsBedrockFieldNamesAndUnsetComponents() {
-        ItemDisplayTransforms transforms = parse("""
+        ItemDisplayTransformsData data = parseData("""
                 {"gui": {"translation": [16, -8, 4], "rotation_pivot": [1, 2, 3],
                 "scale_pivot": [4, 5, 6], "fit_to_frame": false}}
                 """);
-        String json = GsonUtil.CLIENT_GSON.toJson(transforms);
+        String json = GsonUtil.CLIENT_GSON.toJson(data);
         JsonObject object = JsonParser.parseString(json).getAsJsonObject();
 
         assertFalse(object.has("transforms"));
@@ -155,7 +162,11 @@ class ItemDisplayTransformsTest {
     }
 
     private static ItemDisplayTransforms parse(String json) {
-        return GsonUtil.CLIENT_GSON.fromJson(json, ItemDisplayTransforms.class);
+        return ItemDisplayTransformsMapper.toApi(parseData(json));
+    }
+
+    private static ItemDisplayTransformsData parseData(String json) {
+        return GsonUtil.CLIENT_GSON.fromJson(json, ItemDisplayTransformsData.class);
     }
 }
 

@@ -5,6 +5,7 @@ import mods.mewkooo.bedrockmodel.api.model.BakerOptions;
 import mods.mewkooo.bedrockmodel.BedrockModelMod;
 import mods.mewkooo.bedrockmodel.core.model.LocatorData;
 import mods.mewkooo.bedrockmodel.core.json.pojo.*;
+import mods.mewkooo.bedrockmodel.core.json.mapping.ItemDisplayTransformsMapper;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -32,7 +33,7 @@ public class BedrockModelBaker {
         if (source.bones == null || source.bones.length == 0) {
             return new BakedBedrockModel(new BakedBoneDefinition[0], Map.of(), new BakedGeometryChunk[0], new BakedCubeGeometry[0], options.retainCubeGeometry(),
                     new BoneLocator[0], Map.of(), new QueryTransform[0], Map.of(), new ArrayPoseBuilder().toPose(), source.renderBoundingBox,
-                    pojo.getItemDisplayTransforms());
+                    ItemDisplayTransformsMapper.toApi(pojo.getItemDisplayTransformsData()));
         }
 
         Map<String, CompileBone> compileBones = createCompileBones(source.bones);
@@ -56,7 +57,7 @@ public class BedrockModelBaker {
         return new BakedBedrockModel(bakedBoneDefinitions, runtimeIndex.indexByName, bakeResult.chunks(),
                 bakeResult.cubeGeometry(), options.retainCubeGeometry(), locatorResult.locators, locatorResult.locatorByName,
                 queryResult.queryTransforms, queryResult.queryTransformByName, bindPose, source.renderBoundingBox,
-                pojo.getItemDisplayTransforms());
+                ItemDisplayTransformsMapper.toApi(pojo.getItemDisplayTransformsData()));
     }
 
     private static ModelSource modelSource(BedrockModelPOJO pojo) {

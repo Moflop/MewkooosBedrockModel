@@ -8,39 +8,39 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import com.google.gson.JsonSyntaxException;
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransform;
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransforms;
+import mods.mewkooo.bedrockmodel.core.json.pojo.ItemDisplayTransformData;
+import mods.mewkooo.bedrockmodel.core.json.pojo.ItemDisplayTransformsData;
 
 import java.lang.reflect.Type;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public class ItemDisplayTransformsSerializer implements JsonDeserializer<ItemDisplayTransforms>, JsonSerializer<ItemDisplayTransforms> {
+public class ItemDisplayTransformsSerializer implements JsonDeserializer<ItemDisplayTransformsData>, JsonSerializer<ItemDisplayTransformsData> {
     @Override
-    public ItemDisplayTransforms deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
+    public ItemDisplayTransformsData deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context)
             throws JsonParseException {
         if (!json.isJsonObject()) {
             throw new JsonSyntaxException("Expected item_display_transforms to be an object");
         }
-        Map<String, ItemDisplayTransform> transforms = new LinkedHashMap<>();
+        Map<String, ItemDisplayTransformData> transforms = new LinkedHashMap<>();
         for (Map.Entry<String, JsonElement> entry : json.getAsJsonObject().entrySet()) {
             String name = entry.getKey();
             if (!entry.getValue().isJsonObject()) {
                 throw new JsonSyntaxException("Expected item_display_transforms." + name + " to be an object");
             }
             try {
-                transforms.put(name, context.deserialize(entry.getValue(), ItemDisplayTransform.class));
+                transforms.put(name, context.deserialize(entry.getValue(), ItemDisplayTransformData.class));
             } catch (JsonParseException exception) {
                 throw new JsonSyntaxException("Invalid item_display_transforms." + name + ": " + exception.getMessage(), exception);
             }
         }
-        return transforms.isEmpty() ? ItemDisplayTransforms.NONE : new ItemDisplayTransforms(transforms);
+        return transforms.isEmpty() ? ItemDisplayTransformsData.NONE : new ItemDisplayTransformsData(transforms);
     }
 
     @Override
-    public JsonElement serialize(ItemDisplayTransforms src, Type typeOfSrc, JsonSerializationContext context) {
+    public JsonElement serialize(ItemDisplayTransformsData src, Type typeOfSrc, JsonSerializationContext context) {
         JsonObject object = new JsonObject();
-        src.getTransforms().forEach((name, transform) -> object.add(name, context.serialize(transform)));
+        src.transforms().forEach((name, transform) -> object.add(name, context.serialize(transform)));
         return object;
     }
 }

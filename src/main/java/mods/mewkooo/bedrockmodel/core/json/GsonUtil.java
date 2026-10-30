@@ -6,8 +6,8 @@ import mods.mewkooo.bedrockmodel.core.json.exclusion.ServerNormalExclusionStrate
 import mods.mewkooo.bedrockmodel.core.json.pojo.AnimationKeyframes;
 import mods.mewkooo.bedrockmodel.core.json.pojo.BedrockModelPOJO;
 import mods.mewkooo.bedrockmodel.core.json.pojo.CubesItem;
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransform;
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransforms;
+import mods.mewkooo.bedrockmodel.core.json.pojo.ItemDisplayTransformData;
+import mods.mewkooo.bedrockmodel.core.json.pojo.ItemDisplayTransformsData;
 import mods.mewkooo.bedrockmodel.core.json.pojo.ParticleEffectKeyframes;
 import mods.mewkooo.bedrockmodel.core.json.pojo.SoundEffectKeyframes;
 import mods.mewkooo.bedrockmodel.core.json.pojo.TimelineKeyframes;
@@ -28,8 +28,8 @@ public class GsonUtil {
             .registerTypeAdapter(ResourceLocation.class, new ResourceLocation.Serializer())
             .registerTypeAdapter(CubesItem.class, new CubesItem.Deserializer())
             .registerTypeAdapter(Vector3f.class, new Vector3fSerializer())
-            .registerTypeAdapter(ItemDisplayTransform.class, new ItemDisplayTransformSerializer())
-            .registerTypeAdapter(ItemDisplayTransforms.class, new ItemDisplayTransformsSerializer())
+            .registerTypeAdapter(ItemDisplayTransformData.class, new ItemDisplayTransformSerializer())
+            .registerTypeAdapter(ItemDisplayTransformsData.class, new ItemDisplayTransformsSerializer())
             .registerTypeAdapter(AnimationKeyframes.class, new AnimationKeyframesSerializer())
             .registerTypeAdapter(SoundEffectKeyframes.class, new SoundEffectKeyframesSerializer())
             .registerTypeAdapter(ParticleEffectKeyframes.class, new ParticleEffectKeyframesSerializer())

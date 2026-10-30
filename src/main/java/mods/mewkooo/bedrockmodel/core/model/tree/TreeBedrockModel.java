@@ -1,6 +1,6 @@
 package mods.mewkooo.bedrockmodel.core.model.tree;
 
-import mods.mewkooo.bedrockmodel.api.json.ItemDisplayTransforms;
+import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransforms;
 import mods.mewkooo.bedrockmodel.api.model.AnimatedBedrockModel;
 import mods.mewkooo.bedrockmodel.api.model.ModelType;
 import mods.mewkooo.bedrockmodel.core.json.pojo.BedrockModelPOJO;
