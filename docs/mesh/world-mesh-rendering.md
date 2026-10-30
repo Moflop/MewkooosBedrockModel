@@ -1,6 +1,6 @@
 # 世界网格渲染组使用
 
-类型位于 `com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh.world`。调用方负责对象有效性、光照采样及几何，库负责遍历、缓存、上传、剔除与绘制；两种策略的组织见 [最终设计](README.md)。
+类型位于 `mods.mewkooo.bedrockmodel.client.mesh.world`。调用方负责对象有效性、光照采样及几何，库负责遍历、缓存、上传、剔除与绘制；两种策略的组织见[本目录说明](README.md)。这些 API 仅供客户端使用，且仍属实验性。
 
 ## 登记对象
 
@@ -48,7 +48,7 @@ modelId、texture 为接入方的资源 ID；实际朝向及外观变化应在�
 | geometryKey | 必须提供不可变非 null key；相同 key 的完整几何与材质必须等价 |
 | collectGeometry | 必须提供；false 丢弃本次结果并限额重试，true 的空几何有效 |
 
-登记按对象引用身份，重复 track 无操作；更换适配器先 untrack 再 track。所有操作和回调在渲染线程执行，track 要求当前存在世界。
+登记按对象引用身份，重复 track 无操作；更换适配器先 untrack 再 track。所有操作和回调在渲染线程执行，track 要求当前存在客户端世界。不要从公共初始化或专用服务器代码调用。
 
 几何 key 包含模型、材质、拓扑、骨骼姿势与内部显隐；origin、localTransform、整体显隐和 light 独立返回。同组同 key 共享捕获结果，库从当前有效对象中选择提供者。
 

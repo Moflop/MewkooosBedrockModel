@@ -1,6 +1,6 @@
 package mods.mewkooo.bedrockmodel;
 
-import mods.mewkooo.bedrockmodel.v2.client.config.WorldMeshConfig;
+import mods.mewkooo.bedrockmodel.client.config.WorldMeshConfig;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;

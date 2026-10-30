@@ -1,6 +1,6 @@
 # 即时与批量静态网格使用
 
-类型位于 `com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh`，捕获接口位于 `.capture`。缓存、上传与属性设计见 [最终设计](README.md)。
+类型位于 `mods.mewkooo.bedrockmodel.client.mesh`，捕获接口位于 `.capture`。缓存、上传与属性设计见 [本目录说明](README.md)。这些 API 是实验性的客户端优化入口，普通模型渲染不需要依赖它们。
 
 ## 调用入口
 
@@ -50,17 +50,16 @@ provider 在本次调用的预算内同步捕获，资源暂不可用返回 fals
 
 外观解析前可调用 `supportsInstanceAttributes(light, overlay)` 和 `isOwnerEnabled(owner)`；明确不支持时保持 UNSUPPORTED。关闭某功能使用 `invalidateOwner(owner)`。`preparationStats()` 提供准备、上传、驻留及捕获统计。
 
-1.20.1 的 TaCZ 接入使用 `tacz:external_item_guns`，在第三人称右手、GROUND 和世界内 FIXED 即时绘制，展示枪使用 [世界渲染组](world-mesh-rendering.md)。这些下游接入代码不随 SBM 库移植自动更新；1.21.1 接入方需要迁移到新的包和入口，并按实际选中 LOD 生成动态效果。实体／BER／shadow 批次各有独立 scope，源版本的批量接入尚未实施。
+历史上的 1.20.1 TaCZ 接入使用 `tacz:external_item_guns`，在第三人称右手、GROUND 和世界内 FIXED 即时绘制，展示枪使用[世界渲染组](world-mesh-rendering.md)。该旧集成说明不是当前版本的真实下游示例；接入方应按当前源码包和所选 LOD 重新实现。
 
 ## 构建与检查
 
 ```powershell
 ./gradlew build --offline
 ./gradlew publishToMavenLocal --offline
-./tools/run_immediate_integer_attributes_gl_check.ps1 -JavaHome $env:JAVA_HOME
 ```
 
-GL 工具要求 JDK 21，使用已有 `build/moddev/clientLegacyClasspath.txt` 和 NeoForge 的合并 JAR；`JAVA_HOME` 未指向 JDK 21 时通过 `-JavaHome` 传入其目录。该工具属于 Git 忽略的本地开发文件，发布源码包不包含它。Maven Local 坐标为 `com.github.mcmodderanchor:simplebedrockmodel:2.6.0-neoforge-mc1.21.1`。
+Maven Local 坐标为 `mods.mewkooo.bedrockmodel:mewkooos_bedrock_model:1.0.0-neoforge-mc1.21.1`。当前仓库未包含 GL 像素读回脚本；上面的 `build` 只验证编译和自动化测试，不代表真实游戏画面或 GPU 路径已验证。
 
 开发客户端的最小画面／性能对照：
 

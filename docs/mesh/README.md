@@ -2,11 +2,11 @@
 
 本文档描述针对较高精度的静态模型的实验性优化尝试。相关API和内部实现随时可能变更，暂不推荐作为稳定的长期方案。
 
-对应 `2.6.0-neoforge-mc1.21.1`。使用方法见 [即时／批量接口](static-mesh-api.md) 和 [世界渲染组](world-mesh-rendering.md)，本次平台适配与验证见 [移植记录](../1.21.1-2.6.0-port.md)。
+本文对应当前源码中的 `mods.mewkooo.bedrockmodel` 包。使用方法见 [即时／批量接口](static-mesh-api.md) 和 [世界渲染组](world-mesh-rendering.md)。下方历史性能记录来自先前版本，仅供理解设计背景，不是当前源码版本的验证声明。
 
 ## 结构与职责
 
-包根为 `com.github.mcmodderanchor.simplebedrockmodel.v2.client.mesh`。调用方提供几何、不可变 key 和实例状态；SBM 管理捕获、缓存、上传、剔除与绘制。
+包根为 `mods.mewkooo.bedrockmodel.client.mesh`。调用方提供几何、不可变 key 和实例状态；SBM 管理捕获、缓存、上传、剔除与绘制。
 
 - 临时网格：`StaticMeshRenderer`／`StaticMeshBufferSource` 使用 `(owner, geometryKey)` 缓存，处理当前调用或渲染阶段的命令。
 - 世界网格：`WorldMeshGroup` 登记长期对象，每组独立缓存；`WorldMeshRenderer` 在 AFTER_BLOCK_ENTITIES 读取状态、准备和绘制。
@@ -48,7 +48,9 @@ provider 在当前调用内同步捕获并编码，保留 BufferBuilder／Oculus
 
 所有操作在渲染线程执行。资源／格式／GL context 或世界失效时清理对应任务、缓存和命令。临时路径首次 RuntimeException 记录并禁用 owner，后续返回 UNSUPPORTED，生命周期重置后恢复；参数表分配故障停用后端。可能已部分绘制的本次调用仍由 VBO 接管，避免重复绘制；清理失败附加到原异常并向上传播。
 
-## 验证依据与边界
+## 历史验证依据与边界
+
+以下数据记录的是 2.6.0-neoforge-mc1.21.1 和 2.5.26 等之前版本，不能当作当前仓库 `1.0.0-neoforge-mc1.21.1` 的测试或运行结果。
 
 | 依据 | 保留结论 |
 | --- | --- |
