@@ -50,7 +50,7 @@ public final class BedrockResources {
 }
 ```
 
-`treeModel` 保留骨骼树并适合每个实体创建运行时实例；`bakedModel` 预先烘焙几何；`legacyModel` 仅用于仍需要客户端 `client.legacy.model.BedrockModel` 渲染实现的场景。一个 builder 必须调用一次 `register()`；同一模型或动画 ID 重复注册会抛出 `IllegalArgumentException`。`animation(...)` 的动画文件必须使用与模型骨骼兼容的来源，默认 loader 会按当前运行端选择 Gson 配置。
+`treeModel` 保留骨骼树并适合每个实体创建运行时实例；`bakedModel` 预先烘焙几何；`legacyModel` 仅用于仍需要客户端 `client.legacy.model.BedrockModel` 渲染实现的场景。一个 builder 必须调用一次 `register()`；同一模型 ID 重复注册会抛出 `IllegalArgumentException`。多个模型可以关联同一个动画文件 ID，前提是使用同一个 `RawResourceLoader` 实例（省略 loader 时自动共享事件的默认实例）；不同 loader 实例会被视为冲突，整个 `register()` 在修改注册表前失败。每个模型保留自己的动画关联和 lazy 标记；共享动画源只有在所有使用者均调用 `.lazy()` 时才延迟加载，任一 eager 使用者都会使该源在重载时预加载，注册顺序不影响结果。`animation(...)` 的动画文件必须使用与模型骨骼兼容的来源，默认 loader 会按当前运行端选择 Gson 配置。
 
 ## 查询、动画和渲染时机
 
@@ -92,6 +92,8 @@ public final class ExampleRenderer {
 ```
 
 `BedrockResources.models(LogicalSide.CLIENT)` 只提供客户端当前重载世代的只读查询；服务端逻辑使用 `models(LogicalSide.SERVER)`。资源读取、缓存和模型构造由内部 `core.resource` 完成。`BedrockModelResource.model()` 是 `api.model.BedrockModel`，可动画模型实现 `AnimatedBedrockModel` 并创建 `BedrockModelInstance`。动画混合、播放状态、声音/粒子副作用和渲染线程调度由接入方负责。模型对象和实例可能在下一次资源重载后失效，重载回调中应重新按 ID 获取。
+
+TREE 和 BAKED 骨骼的法线变换使用局部位置变换线性部分的逆转置，逐层组合父骨骼变换，支持非均匀缩放和负缩放；普通顶点写入与加速后端共用该法线矩阵。零缩放等奇异变换不存在逆矩阵：若局部逆转置不可用或产生非有限值，则该骨骼的局部法线贡献回退为单位矩阵，保留传入的父级法线矩阵，位置仍按原变换处理。`getGlobalNormal()` 则对整个全局变换求逆转置，失败时返回单位矩阵。奇异姿态下两者只保证有限的法线回退值，不保证退化面的光照方向。
 
 ## 模块职责与依赖方向
 

@@ -78,19 +78,7 @@ public abstract class BoneTreeInstance implements BedrockModelInstance {
      * introduce non-finite values into a render pose.
      */
     public Matrix3f getGlobalNormal(int index) {
-        Matrix3f normal = new Matrix3f(getGlobalTransform(index));
-        float determinant = normal.determinant();
-        if (!Float.isFinite(determinant) || determinant == 0.0F) {
-            return normal.identity();
-        }
-        normal.invert().transpose();
-        return isFinite(normal) ? normal : normal.identity();
-    }
-
-    private static boolean isFinite(Matrix3f matrix) {
-        return Float.isFinite(matrix.m00()) && Float.isFinite(matrix.m01()) && Float.isFinite(matrix.m02())
-                && Float.isFinite(matrix.m10()) && Float.isFinite(matrix.m11()) && Float.isFinite(matrix.m12())
-                && Float.isFinite(matrix.m20()) && Float.isFinite(matrix.m21()) && Float.isFinite(matrix.m22());
+        return NormalTransforms.inverseTransposeOrIdentity(new Matrix3f(getGlobalTransform(index)));
     }
 
     @Override

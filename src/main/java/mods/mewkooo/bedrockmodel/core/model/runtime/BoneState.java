@@ -10,6 +10,7 @@ import org.joml.Vector3f;
 /** Mutable pose state for one model bone. All transforms are side independent. */
 public class BoneState {
     private final BoneDefinition definition;
+    private final Matrix3f localNormalTransform = new Matrix3f();
     public float x, y, z;
     public final Quaternionf rotation = new Quaternionf();
     public final Vector3f rotationInEuler = new Vector3f();
@@ -43,13 +44,19 @@ public class BoneState {
         return matrix;
     }
 
-    /** Applies this bone's local transform, including any baked parent transform. */
+    /**
+     * Applies this bone's local transform, including any baked parent transform.
+     * Normals use the inverse transpose of the local linear transform. If that transform
+     * is singular or its inverse is non-finite, its normal contribution is identity:
+     * the incoming normal matrix is preserved while positions still receive the transform.
+     */
     public void applyLocalTransform(Matrix4f pose, Matrix3f normal) {
         Matrix4f foldedParentTransform = definition.foldedParentTransform();
         if (foldedParentTransform != null) {
             pose.mul(foldedParentTransform);
-            Matrix3f foldedParentNormal = definition.foldedParentNormalTransform();
-            normal.mul(foldedParentNormal == null ? new Matrix3f(foldedParentTransform) : foldedParentNormal);
+            localNormalTransform.set(foldedParentTransform).rotate(rotation);
+        } else {
+            localNormalTransform.rotation(rotation);
         }
         if (x != 0 || y != 0 || z != 0) pose.translate(x / 16.0F, y / 16.0F, z / 16.0F);
         if (definition.rotateAroundPivot()) {
@@ -61,7 +68,8 @@ public class BoneState {
             pose.rotate(rotation);
             pose.scale(xScale, yScale, zScale);
         }
-        normal.rotate(rotation).scale(xScale, yScale, zScale);
+        localNormalTransform.scale(xScale, yScale, zScale);
+        normal.mul(NormalTransforms.inverseTransposeOrIdentity(localNormalTransform));
     }
 
     public Matrix4f getBindLocalTransform() {

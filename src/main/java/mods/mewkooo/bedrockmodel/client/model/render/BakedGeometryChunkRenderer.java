@@ -101,6 +101,13 @@ public class BakedGeometryChunkRenderer {
             float tnx = normalMatrix.m00() * nx + normalMatrix.m10() * ny + normalMatrix.m20() * nz;
             float tny = normalMatrix.m01() * nx + normalMatrix.m11() * ny + normalMatrix.m21() * nz;
             float tnz = normalMatrix.m02() * nx + normalMatrix.m12() * ny + normalMatrix.m22() * nz;
+            float normalLength = tnx * tnx + tny * tny + tnz * tnz;
+            if (normalLength > 1.0E-12f) {
+                float invLength = (float) (1.0 / Math.sqrt(normalLength));
+                tnx *= invLength;
+                tny *= invLength;
+                tnz *= invLength;
+            }
             if (cull && shouldCullQuad(positions, pb, poseMatrix, tnx, tny, tnz)) {
                 continue;
             }

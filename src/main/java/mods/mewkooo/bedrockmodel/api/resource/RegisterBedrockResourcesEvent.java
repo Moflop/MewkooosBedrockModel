@@ -86,20 +86,36 @@ public final class RegisterBedrockResourcesEvent extends Event implements IModBu
             this.kind = Objects.requireNonNull(kind, "kind");
         }
 
+        /** Defers this model and its animation sources unless another model requires a shared source eagerly. */
         public ModelBuilder lazy() { lazy = true; return this; }
         public ModelBuilder options(BakerOptions options) { return options(context -> options); }
         public ModelBuilder options(Function<BedrockModelBakeContext, BakerOptions> factory) { optionsFactory = Objects.requireNonNull(factory, "factory"); return this; }
         public ModelBuilder animation(ResourceLocation animationId) { return animation(animationId, defaultLoader); }
+        /**
+         * Associates an animation source with this model. Other models may share the same source ID
+         * only with the same loader instance. A shared source is lazy only when all its models are lazy.
+         */
         public ModelBuilder animation(ResourceLocation animationId, RawResourceLoader loader) {
             animations.put(Objects.requireNonNull(animationId, "animationId"), Objects.requireNonNull(loader, "loader"));
             return this;
         }
         public void register() {
             if (modelRegistry.containsKey(modelId)) throw new IllegalArgumentException("Bedrock model is already registered: " + modelId);
-            for (ResourceLocation animationId : animations.keySet()) if (animationRegistry.containsKey(animationId)) throw new IllegalArgumentException("Bedrock animation is already registered: " + animationId);
+            // Validate every source before adding the model or promoting any shared source to eager.
+            for (Map.Entry<ResourceLocation, RawResourceLoader> animation : animations.entrySet()) {
+                AnimationRegistration existing = animationRegistry.get(animation.getKey());
+                if (existing != null && existing.rawLoader() != animation.getValue()) {
+                    throw new IllegalArgumentException("Bedrock animation is already registered with a different loader instance: " + animation.getKey());
+                }
+            }
             Function<BedrockModelBakeContext, BakerOptions> factory = optionsFactory == null ? BedrockModelBakeContext::optionsFromAnimations : optionsFactory;
             modelRegistry.put(modelId, new ModelRegistration(modelLoader, sourceId, kind, factory, List.copyOf(animations.keySet()), lazy));
-            for (Map.Entry<ResourceLocation, RawResourceLoader> animation : animations.entrySet()) animationRegistry.put(animation.getKey(), new AnimationRegistration(animation.getValue(), lazy));
+            for (Map.Entry<ResourceLocation, RawResourceLoader> animation : animations.entrySet()) {
+                AnimationRegistration existing = animationRegistry.get(animation.getKey());
+                if (existing == null || existing.lazy() && !lazy) {
+                    animationRegistry.put(animation.getKey(), new AnimationRegistration(animation.getValue(), lazy));
+                }
+            }
         }
     }
 

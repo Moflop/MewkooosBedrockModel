@@ -64,6 +64,13 @@ public class SodiumBakedChunkWriter implements ISodiumVertexWriter, ChunkVertexW
             float tnx = n00 * nx + n10 * ny + n20 * nz;
             float tny = n01 * nx + n11 * ny + n21 * nz;
             float tnz = n02 * nx + n12 * ny + n22 * nz;
+            float normalLength = tnx * tnx + tny * tny + tnz * tnz;
+            if (normalLength > 1.0E-12f) {
+                float invLength = (float) (1.0 / Math.sqrt(normalLength));
+                tnx *= invLength;
+                tny *= invLength;
+                tnz *= invLength;
+            }
             if (cull && shouldCullQuad(positions, pb, p00, p01, p02, p10, p11, p12, p20, p21, p22, p30, p31, p32, tnx, tny, tnz)) {
                 continue;
             }
