@@ -17,15 +17,21 @@ dependencies {
 
 ## 最小接入
 
-在模组事件总线注册同一个资源事件处理器。回调只声明资源，不读取文件，也不引用客户端渲染类；客户端和专用服务器都会收到该事件。
+在模组事件总线订阅资源注册事件。事件分别为逻辑客户端和逻辑服务端仓库触发；下面的示例只注册位于 `assets/` 的客户端模型和动画。
+
+`event.getDist()` 表示物理运行环境，`event.getLogicalSide()` 表示当前注册的资源仓库。单人游戏的集成服务器对应 `Dist.CLIENT` 和 `LogicalSide.SERVER`，因此 `@EventBusSubscriber(value = Dist.CLIENT)` 不能代替逻辑侧判断。在声明客户端模型、动画和 `onReload` 回调之前，先检查 `getLogicalSide() == LogicalSide.CLIENT`；服务端数据则使用 `LogicalSide.SERVER`。`onReload` 只接收其注册事件所对应仓库的重载结果，客户端状态的回调也必须先经过逻辑侧筛选。
+
+事件由库的重载桥接创建并发布，订阅方无需自行构造。测试或自定义装配需要创建事件时，必须显式提供 `Dist` 和 `LogicalSide`：仅检查注册声明使用 `new RegisterBedrockResourcesEvent(dist, logicalSide)`，实际读取资源还需传入第三个参数 `RawResourceLoader`。原有 `(Dist)` 和 `(Dist, RawResourceLoader)` 构造器已删除，迁移时根据目标仓库补入逻辑侧，不能根据 `Dist` 推算。
 
 ```java
 import mods.mewkooo.bedrockmodel.api.resource.RegisterBedrockResourcesEvent;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.LogicalSide;
 import net.neoforged.fml.common.EventBusSubscriber;
 
-@EventBusSubscriber(modid = "examplemod", bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = "examplemod", bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public final class BedrockResources {
     private static final ResourceLocation MODEL =
             ResourceLocation.fromNamespaceAndPath("examplemod", "drone");
@@ -34,6 +40,9 @@ public final class BedrockResources {
 
     @SubscribeEvent
     public static void register(RegisterBedrockResourcesEvent event) {
+        if (event.getLogicalSide() != LogicalSide.CLIENT) {
+            return;
+        }
         event.treeModel(MODEL)
                 .animation(ANIMATION)
                 .register();
@@ -102,7 +111,7 @@ public final class ExampleRenderer {
 
 ## 客户端、专用服务器和线程约束
 
-- 统一注册事件在客户端和专用服务器都会触发；不要在事件回调中加载 `net.minecraft.client` 类型。
+- 注册事件分别为逻辑客户端和逻辑服务端仓库触发，集成服务器的 `getDist()` 也是 `Dist.CLIENT`。客户端资源和回调使用 `getLogicalSide() == LogicalSide.CLIENT` 筛选；通用订阅类不要提前引用 `net.minecraft.client` 类型。
 - 客户端 reload 注册会额外挂载 `ParticleDefinitionLoader`；逻辑服务端 listener 同时覆盖专用服务器和单人游戏内置服务器，只挂载模型和动画 listener。
 - 模型资源 listener 必须在动画源 listener 之后注册；不要在 reload apply 之前查询 lazy 资源。
 - `client.mesh`、渲染器、GPU 上传和 `PoseStack` 绘制只能在客户端渲染线程执行。

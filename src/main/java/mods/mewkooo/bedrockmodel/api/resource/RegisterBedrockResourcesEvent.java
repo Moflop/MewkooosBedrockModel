@@ -5,6 +5,7 @@ import mods.mewkooo.bedrockmodel.api.model.ModelType;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.Event;
+import net.neoforged.fml.LogicalSide;
 import net.neoforged.fml.event.IModBusEvent;
 
 import java.util.ArrayList;
@@ -16,17 +17,23 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-/** Public registration entry point; reload repositories and parsed JSON stay in core.resource. */
+/**
+ * Registers resources and reload callbacks for one logical-side repository.
+ * Use {@link #getLogicalSide()} to distinguish client assets from server data;
+ * {@link #getDist()} is CLIENT for both repositories in singleplayer.
+ * The logical side must be supplied explicitly when constructing the event.
+ */
 public final class RegisterBedrockResourcesEvent extends Event implements IModBusEvent {
     private final Map<ResourceLocation, ModelRegistration> modelRegistry = new LinkedHashMap<>();
     private final Map<ResourceLocation, AnimationRegistration> animationRegistry = new LinkedHashMap<>();
     private final List<Consumer<Map<ResourceLocation, BedrockModelResource>>> reloadListeners = new ArrayList<>();
     private final Dist dist;
+    private final LogicalSide logicalSide;
     private final RawResourceLoader defaultLoader;
 
     /** Constructor useful for tests that only inspect registrations. */
-    public RegisterBedrockResourcesEvent(Dist dist) {
-        this(dist, new RawResourceLoader() {
+    public RegisterBedrockResourcesEvent(Dist dist, LogicalSide logicalSide) {
+        this(dist, logicalSide, new RawResourceLoader() {
             @Override
             public <T> T load(java.io.InputStream input, Class<T> type) {
                 throw new IllegalStateException("A runtime resource loader was not supplied");
@@ -34,9 +41,10 @@ public final class RegisterBedrockResourcesEvent extends Event implements IModBu
         });
     }
 
-    /** Used by the mod bootstrap to supply the side-aware JSON loader. */
-    public RegisterBedrockResourcesEvent(Dist dist, RawResourceLoader defaultLoader) {
+    /** Used by the reload bridge to provide the physical and logical sides. */
+    public RegisterBedrockResourcesEvent(Dist dist, LogicalSide logicalSide, RawResourceLoader defaultLoader) {
         this.dist = Objects.requireNonNull(dist, "dist");
+        this.logicalSide = Objects.requireNonNull(logicalSide, "logicalSide");
         this.defaultLoader = Objects.requireNonNull(defaultLoader, "defaultLoader");
     }
 
@@ -50,8 +58,14 @@ public final class RegisterBedrockResourcesEvent extends Event implements IModBu
     public ModelBuilder bakedModel(ResourceLocation modelId, ResourceLocation sourceId) { return bakedModel(modelId, sourceId, defaultLoader); }
     public ModelBuilder bakedModel(ResourceLocation modelId, ResourceLocation sourceId, RawResourceLoader loader) { return new ModelBuilder(modelId, sourceId, loader, ModelType.BAKED); }
 
+    /** Registers a callback for this event's logical-side repository only. */
     public void onReload(Consumer<Map<ResourceLocation, BedrockModelResource>> listener) { reloadListeners.add(Objects.requireNonNull(listener, "listener")); }
+
+    /** Returns the physical distribution; an integrated server also reports {@link Dist#CLIENT}. */
     public Dist getDist() { return dist; }
+
+    /** Returns the repository side; an integrated server reports {@link LogicalSide#SERVER}. */
+    public LogicalSide getLogicalSide() { return logicalSide; }
     public Map<ResourceLocation, ModelRegistration> getModelRegistry() { return Collections.unmodifiableMap(modelRegistry); }
     public Map<ResourceLocation, AnimationRegistration> getAnimationRegistry() { return Collections.unmodifiableMap(animationRegistry); }
     public List<Consumer<Map<ResourceLocation, BedrockModelResource>>> getReloadListeners() { return Collections.unmodifiableList(reloadListeners); }

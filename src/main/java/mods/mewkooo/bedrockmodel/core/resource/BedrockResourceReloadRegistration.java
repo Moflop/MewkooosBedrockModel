@@ -22,23 +22,14 @@ public final class BedrockResourceReloadRegistration {
     private BedrockResourceReloadRegistration() {
     }
 
-    public static void register(Dist dist, Consumer<PreparableReloadListener> registerListener) {
-        register(dist, LogicalSide.SERVER, registerListener, null);
-    }
-
-    /** Registers shared listeners; the legacy factory is injected only by the client bootstrap. */
-    public static void register(Dist dist, Consumer<PreparableReloadListener> registerListener,
-                                Function<BedrockModelPOJO, ? extends BedrockModel> legacyModelFactory) {
-        register(dist, LogicalSide.SERVER, registerListener, legacyModelFactory);
-    }
-
     /** Registers listeners and installs the query view for the selected logical side. */
     public static void register(Dist dist, LogicalSide logicalSide,
                                 Consumer<PreparableReloadListener> registerListener,
                                 Function<BedrockModelPOJO, ? extends BedrockModel> legacyModelFactory) {
         Objects.requireNonNull(registerListener, "registerListener");
         Objects.requireNonNull(logicalSide, "logicalSide");
-        RegisterBedrockResourcesEvent event = new RegisterBedrockResourcesEvent(dist, RawResourceLoaders.COMMON_LOADER);
+        RegisterBedrockResourcesEvent event = new RegisterBedrockResourcesEvent(
+                dist, logicalSide, RawResourceLoaders.COMMON_LOADER);
         ModLoader.postEvent(event);
 
         Map<ResourceLocation, BedrockAnimationEntry> animations = new LinkedHashMap<>();
