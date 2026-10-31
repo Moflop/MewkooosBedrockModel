@@ -143,7 +143,7 @@ public class SnowStormParticle extends TextureSheetParticle {
         // 锚点跟随：记录出生锚点（发射器 worldTransform），并把当前世界坐标反算为锚点局部坐标；
         // 渲染时用当前 worldTransform 重新变换回世界坐标，位置与朝向均跟随锚点
         this.followAnchor = emitter.isFollowAnchor();
-        if (followAnchor) {
+        if (followAnchor && !particleData.parametricPosition) {
             Matrix4f spawnTransform = new Matrix4f(emitter.getWorldTransform()).invert();
             Vector4f local = new Vector4f(particleData.x, particleData.y, particleData.z, 1.0f);
             spawnTransform.transform(local);
@@ -171,19 +171,18 @@ public class SnowStormParticle extends TextureSheetParticle {
             this.hasCollision = collisionComponent.enabled().evaluate(emitter.getMolang().getContext()) != 0;
         }
 
-        float savedX = particleData.x, savedY = particleData.y, savedZ = particleData.z;
-
         emitter.updateSingleParticle(particleData, dt);
-
-        particleData.x = savedX;
-        particleData.y = savedY;
-        particleData.z = savedZ;
 
         this.xd = particleData.vx / 20f;
         this.yd = particleData.vy / 20f;
         this.zd = particleData.vz / 20f;
 
-        this.move(this.xd, this.yd, this.zd);
+        if (particleData.parametricPosition) {
+            this.move(particleData.x - (float) this.x, particleData.y - (float) this.y,
+                    particleData.z - (float) this.z);
+        } else {
+            this.move(this.xd, this.yd, this.zd);
+        }
 
         particleData.vx = (float) this.xd * 20f;
         particleData.vy = (float) this.yd * 20f;
@@ -211,6 +210,12 @@ public class SnowStormParticle extends TextureSheetParticle {
         }
 
         this.age++;
+    }
+
+    @Override
+    public void remove() {
+        super.remove();
+        emitter.releaseExternalParticle(particleData);
     }
 
     @Override
@@ -261,6 +266,9 @@ public class SnowStormParticle extends TextureSheetParticle {
                     particleData.vy * particleData.vy +
                     particleData.vz * particleData.vz
             );
+            particleData.x = (float) this.x;
+            particleData.y = (float) this.y;
+            particleData.z = (float) this.z;
             emitter.fireCollisionEvents(particleData, speed);
 
             if (expireOnContact) {
@@ -283,7 +291,7 @@ public class SnowStormParticle extends TextureSheetParticle {
     public void render(VertexConsumer buffer, Camera camera, float partialTicks) {
         Vec3 camPos = camera.getPosition();
         float cx, cy, cz;
-        if (followAnchor) {
+        if (followAnchor && !particleData.parametricPosition) {
             // 锚点跟随：用发射器当前 worldTransform（含旋转+平移）把局部坐标变换回世界坐标
             emitter.getWorldTransform().transformPosition(localX, localY, localZ, FOLLOW_POS);
             cx = FOLLOW_POS.x - (float) camPos.x();
@@ -418,7 +426,11 @@ public class SnowStormParticle extends TextureSheetParticle {
             }
             case LOOKAT_DIRECTION -> {
                 // X 轴沿速度方向（facingDirection），然后绕 X 轴旋转使面片尽量朝向摄像机
-                TEMP_VEC.set(particleData.vx, particleData.vy, particleData.vz);
+                if (particleData.parametricDirection) {
+                    TEMP_VEC.set(particleData.directionX, particleData.directionY, particleData.directionZ);
+                } else {
+                    TEMP_VEC.set(particleData.vx, particleData.vy, particleData.vz);
+                }
                 float len = TEMP_VEC.length();
                 if (len > 0.0001f) {
                     TEMP_VEC.normalize();

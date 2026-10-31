@@ -29,7 +29,7 @@ public final class BedrockResourceReloadRegistration {
         Objects.requireNonNull(registerListener, "registerListener");
         Objects.requireNonNull(logicalSide, "logicalSide");
         RegisterBedrockResourcesEvent event = new RegisterBedrockResourcesEvent(
-                dist, logicalSide, RawResourceLoaders.COMMON_LOADER);
+                dist, logicalSide, RawResourceLoaders.forLogicalSide(logicalSide));
         ModLoader.postEvent(event);
 
         Map<ResourceLocation, BedrockAnimationEntry> animations = new LinkedHashMap<>();

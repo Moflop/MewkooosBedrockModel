@@ -78,6 +78,11 @@ configurations {
     // 让测试编译期能访问 Minecraft / NeoForge 等主模块的编译依赖
     testCompileClasspath.extendsFrom compileClasspath
     testRuntimeClasspath.extendsFrom runtimeClasspath
+
+    // Resolves the just-published coordinates for the downstream API
+    // compilation check below. Keeping this separate avoids polluting the
+    // normal test/runtime classpaths with a self dependency.
+    downstreamCompile
 }
 
 repositories {
@@ -117,6 +122,8 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
     testImplementation "org.joml:joml:1.10.5"
+
+    downstreamCompile "${mod_group_id}:${archivesBaseName}:${mod_version}"
 
     // JMH: mocha 原版 (javassist) 用于性能对比
     jmhImplementation 'team.unnamed:mocha:3.0.1'
@@ -180,6 +187,23 @@ test {
     useJUnitPlatform()
 }
 
+sourceSets {
+    downstream {
+        java.srcDir 'src/test/downstream'
+    }
+}
+
+// Compile a tiny consumer against the published Maven coordinates. This
+// catches public API signatures whose third-party types are absent from POM.
+tasks.register('compileDownstreamApi', JavaCompile) {
+    dependsOn publishToMavenLocal
+    source = sourceSets.downstream.java
+    classpath = configurations.downstreamCompile
+    destinationDirectory = layout.buildDirectory.dir('downstream/classes')
+    options.release = 21
+    options.encoding = 'UTF-8'
+}
+
 jmh {
     zip64 = true
     jmhVersion = '1.37'
@@ -221,6 +245,20 @@ publishing {
                     license {
                         name = mod_license
                     }
+                }
+                // Mae types appear in the public animation/model API. It is
+                // compile-time visible to consumers; the runtime copy remains
+                // embedded in this mod JAR through Jar-in-Jar.
+                withXml {
+                    def dependenciesNode = asNode().appendNode('dependencies')
+                    def maeDependency = dependenciesNode.appendNode('dependency')
+                    maeDependency.appendNode('groupId', 'com.maydaymemory')
+                    maeDependency.appendNode('artifactId', 'mae')
+                    maeDependency.appendNode('version', '1.1.4')
+                    // Keep this as a normal compile dependency: provided is
+                    // intentionally non-transitive and would recreate the
+                    // downstream "cannot access Pose" failure.
+                    maeDependency.appendNode('scope', 'compile')
                 }
             }
         }

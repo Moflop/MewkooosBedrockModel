@@ -4,6 +4,7 @@ import mods.mewkooo.bedrockmodel.core.particle.data.component.IParticleComponent
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import org.joml.Matrix4f;
 
 /**
  * 单个粒子实例。所有坐标都在局部坐标系中。
@@ -13,6 +14,15 @@ public class ParticleInstance {
     public float x, y, z;
     // 速度
     public float vx, vy, vz;
+    /** A parametric component supplied this tick's position rather than velocity integration. */
+    public boolean parametricPosition;
+    /** The current parametric position is still in emitter-local space for this update. */
+    public boolean parametricPositionPendingTransform;
+    public boolean parametricDirection;
+    public float directionX, directionY, directionZ;
+    /** Birth transform for parametric particles that do not follow emitter position. */
+    @Nullable
+    public Matrix4f spawnTransform;
     // 颜色
     public float r = 1f, g = 1f, b = 1f, a = 1f;
     // 尺寸
@@ -52,6 +62,9 @@ public class ParticleInstance {
     public void reset() {
         x = y = z = 0;
         vx = vy = vz = 0;
+        parametricPosition = parametricPositionPendingTransform = parametricDirection = false;
+        directionX = directionY = directionZ = 0;
+        spawnTransform = null;
         r = g = b = a = 1f;
         width = height = 0.1f;
         rotation = 0;
@@ -72,9 +85,11 @@ public class ParticleInstance {
      * @param dt 时间步长（秒）
      */
     public void tick(float dt) {
-        x += vx * dt;
-        y += vy * dt;
-        z += vz * dt;
+        if (!parametricPosition) {
+            x += vx * dt;
+            y += vy * dt;
+            z += vz * dt;
+        }
         rotation += rotationRate * dt;
         age += dt;
         if (age >= maxLifetime) {

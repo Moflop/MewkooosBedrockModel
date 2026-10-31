@@ -9,6 +9,8 @@ import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleMolangEnvironment
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
 import static mods.mewkooo.bedrockmodel.core.particle.data.ParticleJsonUtils.getMolang;
 import static mods.mewkooo.bedrockmodel.core.particle.data.ParticleJsonUtils.getMolangArray3;
@@ -40,6 +42,21 @@ public record ParticleMotionParametric(
             p.x = (float) relativePosition[0].evaluate(ctx);
             p.y = (float) relativePosition[1].evaluate(ctx);
             p.z = (float) relativePosition[2].evaluate(ctx);
+            p.parametricPosition = true;
+            p.parametricPositionPendingTransform = p.worldSpace;
+        }
+        if (direction != null) {
+            Vector3f facing = new Vector3f((float) direction[0].evaluate(ctx),
+                    (float) direction[1].evaluate(ctx), (float) direction[2].evaluate(ctx));
+            if (p.worldSpace && p.emitter != null) {
+                Matrix4f transform = p.emitter.isFollowAnchor()
+                        ? p.emitter.getWorldTransform() : p.spawnTransform;
+                if (transform != null) transform.transformDirection(facing);
+            }
+            if (facing.isFinite() && facing.lengthSquared() > 0) facing.normalize();
+            else facing.zero();
+            p.directionX = facing.x; p.directionY = facing.y; p.directionZ = facing.z;
+            p.parametricDirection = true;
         }
         if (rotation != null) {
             p.rotation = (float) rotation.evaluate(ctx);

@@ -98,6 +98,27 @@ class BedrockModelBakerTest {
     }
 
     @Test
+    @DisplayName("baked model rejects a cycle in folded bone parents")
+    void bakedModelRejectsFoldedParentCycle() {
+        BedrockModelPOJO pojo = loadInlineModel("""
+                {
+                  "format_version": "1.12.0",
+                  "minecraft:geometry": [{
+                    "description": {"identifier":"geometry.test", "texture_width":16, "texture_height":16},
+                    "bones": [
+                      {"name":"a", "parent":"b"},
+                      {"name":"b", "parent":"a"}
+                    ]
+                  }]
+                }
+                """);
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> BakedBedrockModel.bake(pojo, BakerOptions.defaults()));
+        assertTrue(error.getMessage().contains("Cycle in Bedrock bone parents"));
+    }
+
+    @Test
     @DisplayName("structured model rotates local geometry without extra absolute pivot offset")
     void structuredModelRotatesLocalGeometryWithoutExtraAbsolutePivotOffset() {
         BedrockModelPOJO pojo = loadInlineModel("""

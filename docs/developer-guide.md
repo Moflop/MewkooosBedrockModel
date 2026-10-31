@@ -9,9 +9,11 @@
 ```groovy
 repositories { mavenLocal() }
 dependencies {
-    implementation("mods.mewkooo.bedrockmodel:mewkooos_bedrock_model:1.0.2-neoforge-mc1.21.1")
+    implementation("mods.mewkooo.bedrockmodel:mewkooos_bedrock_model:1.0.3-neoforge-mc1.21.1")
 }
 ```
+
+发布 POM 会将 `com.maydaymemory:mae:1.1.4` 作为编译期传递依赖声明，因此下游按此示例声明本库即可编译 `AnimationClip.evaluate` 返回的 `Pose`；不需要手动把 Mod JAR 内嵌的运行时 Jar 加入编译 classpath。
 
 本仓库没有远程发布仓库；本地开发可先运行 `./gradlew publishToMavenLocal`。模组资源使用固定路径：模型 ID `examplemod:drone` 对应 `assets/examplemod/models/bedrock/drone.json`，动画文件 ID `examplemod:drone` 对应 `assets/examplemod/animations/drone.json`。
 

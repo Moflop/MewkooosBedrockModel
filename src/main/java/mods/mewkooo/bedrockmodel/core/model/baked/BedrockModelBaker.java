@@ -38,6 +38,7 @@ public class BedrockModelBaker {
 
         Map<String, CompileBone> compileBones = createCompileBones(source.bones);
         linkCompileBones(source.bones, compileBones);
+        validateParentGraph(compileBones);
 
         Set<String> runtimeBoneNames = collectRuntimeBones(compileBones, options);
         RuntimeIndex runtimeIndex = createRuntimeIndex(source.bones, compileBones, runtimeBoneNames);
@@ -119,6 +120,24 @@ public class BedrockModelBaker {
                     compileBone.parent.children.add(compileBone);
                 }
             }
+        }
+    }
+
+    private static void validateParentGraph(Map<String, CompileBone> compileBones) {
+        Set<CompileBone> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (CompileBone start : compileBones.values()) {
+            if (visited.contains(start)) {
+                continue;
+            }
+            Set<CompileBone> path = Collections.newSetFromMap(new IdentityHashMap<>());
+            CompileBone current = start;
+            while (current != null && !visited.contains(current)) {
+                if (!path.add(current)) {
+                    throw new IllegalArgumentException("Cycle in Bedrock bone parents at '" + current.name + "'");
+                }
+                current = current.parent;
+            }
+            visited.addAll(path);
         }
     }
 
@@ -348,7 +367,11 @@ public class BedrockModelBaker {
 
     static int nearestRuntimeAncestorOrSelf(CompileBone bone) {
         CompileBone current = bone;
+        Set<CompileBone> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         while (current != null) {
+            if (!visited.add(current)) {
+                throw new IllegalArgumentException("Cycle in Bedrock bone parents at '" + current.name + "'");
+            }
             if (current.runtimeIndex >= 0) return current.runtimeIndex;
             current = current.parent;
         }
@@ -420,6 +443,7 @@ public class BedrockModelBaker {
         }
         Map<String, CompileBone> compileBones = createCompileBones(source.bones);
         linkCompileBones(source.bones, compileBones);
+        validateParentGraph(compileBones);
         Set<String> runtimeBoneNames = collectRuntimeBones(compileBones, options);
         RuntimeIndex runtimeIndex = createRuntimeIndex(source.bones, compileBones, runtimeBoneNames);
         QueryResult queryResult = createQueryTransforms(source.bones, compileBones, runtimeIndex);

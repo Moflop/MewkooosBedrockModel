@@ -2,6 +2,7 @@ package mods.mewkooo.bedrockmodel.client.model.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import mods.mewkooo.bedrockmodel.client.legacy.model.BedrockBone;
 import mods.mewkooo.bedrockmodel.api.model.BakerOptions;
 import mods.mewkooo.bedrockmodel.core.json.GsonUtil;
 import mods.mewkooo.bedrockmodel.core.json.pojo.BedrockModelPOJO;
@@ -56,6 +57,29 @@ class BoneNormalRenderingTest {
             setLoadedMods.setAccessible(true);
             setLoadedMods.invoke(modList, List.of());
         }
+    }
+
+    @Test
+    void legacyBoneNormalTransformUsesInverseTransposeUnderNonUniformScale() {
+        BedrockBone bone = new BedrockBone();
+        bone.rotation.identity().rotateY((float) Math.PI / 4.0F);
+        bone.xScale = 2.0F;
+
+        PoseStack poseStack = new PoseStack();
+        bone.translateAndRotateAndScale(poseStack);
+
+        Vector3f edge1 = new Vector3f(1, 0, -1).mulDirection(poseStack.last().pose());
+        Vector3f edge2 = new Vector3f(0, 1, 0).mulDirection(poseStack.last().pose());
+        Vector3f geometricNormal = edge1.cross(edge2, new Vector3f()).normalize();
+        Vector3f emittedNormal = new Vector3f(1, 0, 1)
+                .mul(poseStack.last().normal())
+                .normalize();
+
+        assertEquals(1.0F, emittedNormal.length(), EPSILON);
+        assertEquals(0.0F, emittedNormal.dot(edge1.normalize()), EPSILON);
+        assertEquals(0.0F, emittedNormal.dot(edge2.normalize()), EPSILON);
+        assertTrue(geometricNormal.dot(emittedNormal) > 1.0F - EPSILON,
+                "Legacy normal must face the transformed triangle");
     }
 
     @Test

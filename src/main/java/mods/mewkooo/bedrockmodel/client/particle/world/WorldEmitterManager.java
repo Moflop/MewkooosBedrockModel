@@ -20,6 +20,7 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -142,6 +143,10 @@ public class WorldEmitterManager {
     private void deliverParticle(ActiveWorldEmitter active, ParticleInstance particle) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.particleEngine == null || active.level == null) {
+            // The emitter already counted this particle before invoking the callback.
+            // Release it when the client cannot accept ownership, otherwise the
+            // emitter remains permanently at its max-particles limit.
+            active.emitter.releaseExternalParticle(particle);
             return;
         }
 
@@ -162,18 +167,27 @@ public class WorldEmitterManager {
             py = particle.y;
             pz = particle.z;
         } else {
-            px = active.worldX + particle.x;
-            py = active.worldY + particle.y;
-            pz = active.worldZ + particle.z;
+            Vector3f transformed = active.emitter.getWorldTransform().transformPosition(
+                    particle.x, particle.y, particle.z, new Vector3f());
+            px = transformed.x;
+            py = transformed.y;
+            pz = transformed.z;
         }
 
         // 更新粒子位置为世界坐标
         particle.x = (float) px;
         particle.y = (float) py;
         particle.z = (float) pz;
+        particle.worldSpace = true;
+        particle.spawnTransform = new Matrix4f(active.emitter.getWorldTransform());
 
         SnowStormParticle worldParticle = new SnowStormParticle(active.level, particle, active.definition, active.emitter);
-        mc.particleEngine.add(worldParticle);
+        try {
+            mc.particleEngine.add(worldParticle);
+        } catch (RuntimeException | Error failure) {
+            active.emitter.releaseExternalParticle(particle);
+            throw failure;
+        }
     }
 
     private void updateEmitterTransform(ActiveWorldEmitter active) {

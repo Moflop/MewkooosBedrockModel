@@ -110,6 +110,7 @@ public final class AnimationRateLimiter<T> {
     public void reset() {
         hasUpdate = false;
         lastUpdateNanos = 0;
+        cachedValue = null;
     }
 }
 

@@ -18,6 +18,7 @@ import org.joml.Vector4f;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import net.minecraft.world.phys.Vec3;
 
 public class ParticleEmitterInstance {
     public static final int MAX_PARTICLES = 16384;
@@ -52,6 +53,7 @@ public class ParticleEmitterInstance {
     private final int emitterRandom4 = RANDOM.nextInt();
 
     private final List<ParticleInstance> particles = new ArrayList<>();
+    private final Set<ParticleInstance> externallyManagedParticles = Collections.newSetFromMap(new IdentityHashMap<>());
     private final List<ParticleInstance> pool = new ArrayList<>();
 
     private final Vector4f tempSpawnVec = new Vector4f();
@@ -160,6 +162,8 @@ public class ParticleEmitterInstance {
     // ==================== 粒子管理 ====================
 
     private void spawnParticleInternal() {
+        if (getParticleCount() >= MAX_PARTICLES) return;
+
         ParticleInstance p = obtainParticle();
         p.reset();
         p.random1 = RANDOM.nextFloat();
@@ -191,7 +195,13 @@ public class ParticleEmitterInstance {
         if (hasTransform) applyLocalSpaceOnSpawn(p);
 
         if (spawnCallback != null && (externalParticleManagement || p.worldSpace)) {
-            spawnCallback.onParticleSpawned(p);
+            externallyManagedParticles.add(p);
+            try {
+                spawnCallback.onParticleSpawned(p);
+            } catch (RuntimeException | Error failure) {
+                externallyManagedParticles.remove(p);
+                throw failure;
+            }
         } else {
             particles.add(p);
         }
@@ -209,7 +219,7 @@ public class ParticleEmitterInstance {
         bindEmitterContext();
         int maxParticles = (int) manual.maxParticles().evaluate(molang.getContext());
         int effectiveMax = Math.min(maxParticles, MAX_PARTICLES);
-        int available = Math.max(0, effectiveMax - particles.size());
+        int available = Math.max(0, effectiveMax - getParticleCount());
         int spawnCount = Math.min(count, available);
         for (int i = 0; i < spawnCount; i++) {
             spawnParticleInternal();
@@ -236,6 +246,16 @@ public class ParticleEmitterInstance {
 
         for (IParticleComponent c : p.updateComponents) {
             c.update(p);
+        }
+
+        // Parametric positions are authored in emitter-local space. Apply the
+        // birth transform unless the particle explicitly follows its live anchor.
+        if (p.parametricPositionPendingTransform && p.worldSpace && hasTransform) {
+            Vector4f worldPosition = transformParametricPosition(p);
+            p.x = worldPosition.x;
+            p.y = worldPosition.y;
+            p.z = worldPosition.z;
+            p.parametricPositionPendingTransform = false;
         }
 
         p.tick(dt);
@@ -309,9 +329,12 @@ public class ParticleEmitterInstance {
     public boolean isLocalVelocity() { return localVelocity; }
 
     public float getDt() { return currentDt; }
-    public int getParticleCount() { return particles.size(); }
+    /** Returns all live particles, including particles currently owned by an external manager. */
+    public int getParticleCount() { return particles.size() + externallyManagedParticles.size(); }
+    /** Releases a particle previously handed to an external manager. Safe to call more than once. */
+    public void releaseExternalParticle(ParticleInstance particle) { externallyManagedParticles.remove(particle); }
     public boolean isActive() { return active; }
-    public boolean isFinished() { return removed && particles.isEmpty(); }
+    public boolean isFinished() { return removed && particles.isEmpty() && externallyManagedParticles.isEmpty(); }
 
     public void setRemoved(boolean removed) { this.removed = removed; }
     public void setActive(boolean active) { this.active = active; }
@@ -436,7 +459,7 @@ public class ParticleEmitterInstance {
         ParticleLifetimeEvents evts = definition.particlePreset().find(ParticleLifetimeEvents.class);
         if (evts == null || evts.expirationEvent().isEmpty()) return;
         molang.bindParticle(p.age, p.maxLifetime, p.random1, p.random2, p.random3, p.random4);
-        EventExecutor.fireEvents(evts.expirationEvent(), definition, eventContext);
+        EventExecutor.fireEvents(evts.expirationEvent(), definition, particleEventContext(p));
     }
 
     public void fireCollisionEvents(ParticleInstance p, float speed) {
@@ -448,10 +471,36 @@ public class ParticleEmitterInstance {
             if (speed >= event.minSpeed()) {
                 List<IEventNode> nodes = definition.getEvents().get(event.event());
                 if (nodes != null) {
-                    for (IEventNode node : nodes) EventExecutor.execute(node, eventContext);
+                    for (IEventNode node : nodes) EventExecutor.execute(node, particleEventContext(p));
                 }
             }
         }
+    }
+
+    /** Builds the event view at the particle's current world position. */
+    @Nullable
+    public EventExecutor.EventContext particleEventContext(ParticleInstance particle) {
+        EventExecutor.EventContext base = eventContext;
+        if (base == null || base.position() == null) return base;
+        Vec3 position;
+        if (particle.worldSpace && particle.parametricPositionPendingTransform && hasTransform) {
+            Vector4f transformed = transformParametricPosition(particle);
+            position = new Vec3(transformed.x, transformed.y, transformed.z);
+        } else if (particle.worldSpace) {
+            position = new Vec3(particle.x, particle.y, particle.z);
+        } else if (hasTransform) {
+            Vector4f transformed = worldTransform.transform(
+                    tempSpawnVec.set(particle.x, particle.y, particle.z, 1.0F), new Vector4f());
+            position = new Vec3(transformed.x, transformed.y, transformed.z);
+        } else {
+            position = base.position().add(particle.x, particle.y, particle.z);
+        }
+        return new EventExecutor.EventContext(base.emitter(), base.molang(), base.effects(), position, base.random());
+    }
+
+    private Vector4f transformParametricPosition(ParticleInstance particle) {
+        Matrix4f transform = followAnchor || particle.spawnTransform == null ? worldTransform : particle.spawnTransform;
+        return transform.transform(new Vector4f(particle.x, particle.y, particle.z, 1.0F), new Vector4f());
     }
 
 }

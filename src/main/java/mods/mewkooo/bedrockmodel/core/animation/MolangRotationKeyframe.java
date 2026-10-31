@@ -68,18 +68,12 @@ public class MolangRotationKeyframe extends BaseKeyframe<Rotation> implements In
 
     @Override
     public Rotation getPre(IEvaluationContext ctx) {
-        if (ctx instanceof MolangContext<?> mc) {
-            return evaluate(preFunctions, mc);
-        }
-        return ZERO;
+        return evaluate(preFunctions, requireMolangContext(ctx));
     }
 
     @Override
     public Rotation getPost(IEvaluationContext ctx) {
-        if (ctx instanceof MolangContext<?> mc) {
-            return evaluate(postFunctions, mc);
-        }
-        return ZERO;
+        return evaluate(postFunctions, requireMolangContext(ctx));
     }
 
     @Override
@@ -97,6 +91,14 @@ public class MolangRotationKeyframe extends BaseKeyframe<Rotation> implements In
         float y = (float) functions[1].evaluate(ctx) * mulY * DEGREE_TO_RADIAN;
         float z = (float) functions[2].evaluate(ctx) * mulZ * DEGREE_TO_RADIAN;
         return new Rotation(new Vector3f(x, y, z));
+    }
+
+    private static MolangContext<?> requireMolangContext(IEvaluationContext ctx) {
+        if (ctx instanceof MolangContext<?> mc) {
+            return mc;
+        }
+        throw new IllegalArgumentException("Molang animation keyframes require a MolangContext, got "
+                + (ctx == null ? "null" : ctx.getClass().getName()));
     }
 }
 

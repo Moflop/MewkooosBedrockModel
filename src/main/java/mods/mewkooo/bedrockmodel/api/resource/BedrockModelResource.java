@@ -7,6 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,7 +18,9 @@ public record BedrockModelResource(
 ) {
     public BedrockModelResource {
         java.util.Objects.requireNonNull(model, "model");
-        animations = Map.copyOf(animations);
+        Map<ResourceLocation, List<AnimationClip>> immutableAnimations = new LinkedHashMap<>();
+        animations.forEach((id, clips) -> immutableAnimations.put(id, List.copyOf(clips)));
+        animations = Map.copyOf(immutableAnimations);
     }
 
     public ModelType kind() {

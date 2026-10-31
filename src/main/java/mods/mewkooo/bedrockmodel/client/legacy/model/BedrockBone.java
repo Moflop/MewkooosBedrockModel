@@ -142,10 +142,14 @@ public class BedrockBone {
     public void translateAndRotateAndScale(PoseStack poseStack) {
         poseStack.translate(this.x / 16.0F, this.y / 16.0F, this.z / 16.0F);
         poseStack.last().pose().rotate(rotation);
-        poseStack.last().normal().rotate(rotation);
-        if (this.xScale != 0.0F || this.yScale != 0.0F || this.zScale != 0.0F) {
-            poseStack.last().pose().scale(this.xScale, this.yScale, this.zScale);
-            poseStack.last().normal().scale(this.xScale, this.yScale, this.zScale);
+        poseStack.last().pose().scale(this.xScale, this.yScale, this.zScale);
+
+        float determinant = this.xScale * this.yScale * this.zScale;
+        if (Float.isFinite(determinant) && determinant != 0.0F
+                && Float.isFinite(this.xScale) && Float.isFinite(this.yScale) && Float.isFinite(this.zScale)) {
+            Matrix3f localLinear = new Matrix3f(new Matrix4f().rotate(rotation).scale(this.xScale, this.yScale, this.zScale));
+            localLinear.invert().transpose();
+            poseStack.last().normal().mul(localLinear);
         }
     }
 

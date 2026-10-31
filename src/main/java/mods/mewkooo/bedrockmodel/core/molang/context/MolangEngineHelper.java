@@ -53,9 +53,10 @@ public final class MolangEngineHelper {
      * @param contextClass MolangContext 子类
      * @return 配置完毕的引擎
      */
-    public static MochaEngine<?> createEngine(Class<? extends MolangContext<?>> contextClass) {
+    @SuppressWarnings("rawtypes")
+    public static MochaEngine<?> createEngine(Class<? extends MolangContext> contextClass) {
         try {
-            MolangContext<?> ctx = contextClass.getDeclaredConstructor().newInstance();
+            MolangContext<?> ctx = (MolangContext<?>) contextClass.getDeclaredConstructor().newInstance();
             return createEngine(ctx);
         } catch (ReflectiveOperationException e) {
             throw new IllegalArgumentException(

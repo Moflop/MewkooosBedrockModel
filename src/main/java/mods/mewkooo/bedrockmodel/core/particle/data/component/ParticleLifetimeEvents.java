@@ -76,7 +76,7 @@ public record ParticleLifetimeEvents(
 
         private void fireEvents(List<String> eventNames, ParticleInstance particle) {
             if (eventNames.isEmpty() || particle.emitter == null) return;
-            EventExecutor.EventContext ctx = particle.emitter.getEventContext();
+            EventExecutor.EventContext ctx = particle.emitter.particleEventContext(particle);
             if (ctx == null) return;
             ParticleEffectDefinition def = particle.emitter.getDefinition();
             EventExecutor.fireEvents(eventNames, def, ctx);

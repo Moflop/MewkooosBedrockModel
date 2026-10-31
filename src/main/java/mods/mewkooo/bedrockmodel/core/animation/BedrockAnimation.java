@@ -6,6 +6,7 @@ import mods.mewkooo.bedrockmodel.core.animation.ResourceLocationKeyframe;
 import mods.mewkooo.bedrockmodel.core.animation.TimelineEvent;
 import mods.mewkooo.bedrockmodel.core.animation.TimelineKeyframe;
 import mods.mewkooo.bedrockmodel.core.molang.context.MolangEngineHelper;
+import mods.mewkooo.bedrockmodel.core.molang.runtime.MolangContext;
 import mods.mewkooo.bedrockmodel.core.json.pojo.*;
 import mods.mewkooo.bedrockmodel.core.molang.runtime.MolangExpression;
 import mods.mewkooo.bedrockmodel.core.json.pojo.*;
@@ -20,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class BedrockAnimation extends BasicAnimation implements mods.mewkooo.bedrockmodel.api.animation.AnimationClip {
     private static final float DEGREE_TO_ANGLE = (float) (Math.PI / 180);
@@ -41,8 +43,22 @@ public class BedrockAnimation extends BasicAnimation implements mods.mewkooo.bed
         return specifiedEndTimeS;
     }
 
+    /**
+     * Evaluates with a fresh context so expression variables are not shared
+     * between unrelated callers of the same loaded clip.
+     */
+    @Override
+    public Pose evaluate(float timeSeconds) {
+        return super.evaluate(timeSeconds, new MolangContext<>());
+    }
+
+    @Override
+    public Pose evaluate(float timeSeconds, IEvaluationContext context) {
+        return super.evaluate(timeSeconds, Objects.requireNonNull(context, "context"));
+    }
+
     public static BedrockAnimation createAnimation(String name, BedrockAnimationPOJO pojo, @Nullable BedrockModel indexProvider) {
-        return createAnimation(name, pojo, indexProvider, null);
+        return createAnimation(name, pojo, indexProvider, MolangEngineHelper.createEngine(new MolangContext<>()));
     }
 
     public static BedrockAnimation createAnimation(String name, BedrockAnimationPOJO pojo,
@@ -100,7 +116,7 @@ public class BedrockAnimation extends BasicAnimation implements mods.mewkooo.bed
     }
 
     public static List<BedrockAnimation> createAnimation(BedrockAnimationFile pojo, @Nullable BedrockModel indexProvider) {
-        return createAnimation(pojo, indexProvider, null);
+        return createAnimation(pojo, indexProvider, MolangEngineHelper.createEngine(new MolangContext<>()));
     }
 
     public static List<BedrockAnimation> createAnimation(BedrockAnimationFile pojo,
@@ -132,7 +148,10 @@ public class BedrockAnimation extends BasicAnimation implements mods.mewkooo.bed
     private static InterpolatableKeyframe<Rotation> parseRotationKeyframe(float timeS, AnimationKeyframes.Keyframe keyframe,
                                                                           float x, float y, float z,
                                                                           @Nullable MochaEngine<?> molangEngine) {
-        if (keyframe.hasMolang() && molangEngine != null) {
+        if (keyframe.hasMolang() && molangEngine == null) {
+            throw new IllegalArgumentException("Molang keyframe requires a Molang engine");
+        }
+        if (keyframe.hasMolang()) {
             Interpolator<Vector3fc> vecInterpolator;
             if ("catmullrom".equals(keyframe.getLerpMode())) {
                 vecInterpolator = Vector3fCubicSplineInterpolator.INSTANCE;
@@ -144,10 +163,10 @@ public class BedrockAnimation extends BasicAnimation implements mods.mewkooo.bed
             if (keyframe.getDataExpressions() != null) {
                 preFunctions = postFunctions = compileMolangExpressions(molangEngine, keyframe.getDataExpressions());
             } else {
-                String[] preExprs = keyframe.getPreExpressions() != null ? keyframe.getPreExpressions() : keyframe.getPostExpressions();
-                String[] postExprs = keyframe.getPostExpressions() != null ? keyframe.getPostExpressions() : keyframe.getPreExpressions();
-                preFunctions = compileMolangExpressions(molangEngine, preExprs);
-                postFunctions = (preExprs == postExprs) ? preFunctions : compileMolangExpressions(molangEngine, postExprs);
+                preFunctions = compileMolangValues(molangEngine, keyframe.getPreExpressions(), keyframe.getPre(),
+                        keyframe.getPostExpressions(), keyframe.getPost());
+                postFunctions = compileMolangValues(molangEngine, keyframe.getPostExpressions(), keyframe.getPost(),
+                        keyframe.getPreExpressions(), keyframe.getPre());
             }
             return new MolangRotationKeyframe(timeS, preFunctions, postFunctions, x, y, z,
                     new EulerAnglesRotationInterpolator(vecInterpolator));
@@ -196,7 +215,10 @@ public class BedrockAnimation extends BasicAnimation implements mods.mewkooo.bed
     private static InterpolatableKeyframe<Vector3fc> parseKeyframe(float timeS, AnimationKeyframes.Keyframe keyframe,
                                                                     float x, float y, float z,
                                                                     @Nullable MochaEngine<?> molangEngine) {
-        if (keyframe.hasMolang() && molangEngine != null) {
+        if (keyframe.hasMolang() && molangEngine == null) {
+            throw new IllegalArgumentException("Molang keyframe requires a Molang engine");
+        }
+        if (keyframe.hasMolang()) {
             Interpolator<Vector3fc> interpolator;
             if ("catmullrom".equals(keyframe.getLerpMode())) {
                 interpolator = Vector3fCubicSplineInterpolator.INSTANCE;
@@ -209,16 +231,12 @@ public class BedrockAnimation extends BasicAnimation implements mods.mewkooo.bed
                 MolangExpression[] dataFunctions = compileMolangExpressions(molangEngine, keyframe.getDataExpressions());
                 preFunctions = postFunctions = wrapWithMultiplier(dataFunctions, x, y, z);
             } else {
-                String[] preExprs = keyframe.getPreExpressions() != null ? keyframe.getPreExpressions() : keyframe.getPostExpressions();
-                String[] postExprs = keyframe.getPostExpressions() != null ? keyframe.getPostExpressions() : keyframe.getPreExpressions();
-                MolangExpression[] preRaw = compileMolangExpressions(molangEngine, preExprs);
+                MolangExpression[] preRaw = compileMolangValues(molangEngine, keyframe.getPreExpressions(), keyframe.getPre(),
+                        keyframe.getPostExpressions(), keyframe.getPost());
+                MolangExpression[] postRaw = compileMolangValues(molangEngine, keyframe.getPostExpressions(), keyframe.getPost(),
+                        keyframe.getPreExpressions(), keyframe.getPre());
                 preFunctions = wrapWithMultiplier(preRaw, x, y, z);
-                if (preExprs == postExprs) {
-                    postFunctions = preFunctions;
-                } else {
-                    MolangExpression[] postRaw = compileMolangExpressions(molangEngine, postExprs);
-                    postFunctions = wrapWithMultiplier(postRaw, x, y, z);
-                }
+                postFunctions = wrapWithMultiplier(postRaw, x, y, z);
             }
             return new MolangVector3fKeyframe(timeS, preFunctions, postFunctions, interpolator);
         }
@@ -255,6 +273,38 @@ public class BedrockAnimation extends BasicAnimation implements mods.mewkooo.bed
             result[i] = MolangEngineHelper.compileExpression(engine, expressions[i]);
         }
         return result;
+    }
+
+    /**
+     * Compiles one side of a keyframe while retaining numeric components when
+     * only the opposite side contains Molang expressions.
+     */
+    private static MolangExpression[] compileMolangValues(MochaEngine<?> engine,
+                                                           @Nullable String[] expressions,
+                                                           @Nullable Vector3f values,
+                                                           @Nullable String[] fallbackExpressions,
+                                                           @Nullable Vector3f fallbackValues) {
+        if (expressions != null) {
+            return compileMolangExpressions(engine, expressions);
+        }
+        if (values != null) {
+            return constantExpressions(values);
+        }
+        if (fallbackExpressions != null) {
+            return compileMolangExpressions(engine, fallbackExpressions);
+        }
+        if (fallbackValues != null) {
+            return constantExpressions(fallbackValues);
+        }
+        return constantExpressions(new Vector3f());
+    }
+
+    private static MolangExpression[] constantExpressions(Vector3f values) {
+        return new MolangExpression[]{
+                MolangExpression.constant(values.x()),
+                MolangExpression.constant(values.y()),
+                MolangExpression.constant(values.z())
+        };
     }
 
     /**

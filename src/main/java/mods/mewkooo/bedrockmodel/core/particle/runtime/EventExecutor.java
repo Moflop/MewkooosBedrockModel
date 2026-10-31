@@ -17,6 +17,9 @@ import java.util.Random;
  */
 public final class EventExecutor {
 
+    private static final int MAX_EVENT_DEPTH = 64;
+    private static final ThreadLocal<Integer> EVENT_DEPTH = ThreadLocal.withInitial(() -> 0);
+
     private EventExecutor() {}
 
     /**
@@ -50,6 +53,21 @@ public final class EventExecutor {
     }
 
     public static void execute(IEventNode node, EventContext ctx) {
+        int depth = EVENT_DEPTH.get();
+        if (depth >= MAX_EVENT_DEPTH) {
+            BedrockModelMod.LOGGER.warn("Particle event recursion exceeded {} levels", MAX_EVENT_DEPTH);
+            return;
+        }
+        EVENT_DEPTH.set(depth + 1);
+        try {
+            executeInternal(node, ctx);
+        } finally {
+            if (depth == 0) EVENT_DEPTH.remove();
+            else EVENT_DEPTH.set(depth);
+        }
+    }
+
+    private static void executeInternal(IEventNode node, EventContext ctx) {
         if (node instanceof EventSequence seq) {
             for (IEventNode child : seq.nodes()) {
                 execute(child, ctx);

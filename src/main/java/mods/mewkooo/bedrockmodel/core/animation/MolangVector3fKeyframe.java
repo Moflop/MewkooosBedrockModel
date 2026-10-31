@@ -59,18 +59,12 @@ public class MolangVector3fKeyframe extends BaseKeyframe<Vector3fc> implements I
 
     @Override
     public Vector3fc getPre(IEvaluationContext ctx) {
-        if (ctx instanceof MolangContext<?> mc) {
-            return evaluate(preFunctions, mc);
-        }
-        return ZERO;
+        return evaluate(preFunctions, requireMolangContext(ctx));
     }
 
     @Override
     public Vector3fc getPost(IEvaluationContext ctx) {
-        if (ctx instanceof MolangContext<?> mc) {
-            return evaluate(postFunctions, mc);
-        }
-        return ZERO;
+        return evaluate(postFunctions, requireMolangContext(ctx));
     }
 
     @Override
@@ -89,6 +83,14 @@ public class MolangVector3fKeyframe extends BaseKeyframe<Vector3fc> implements I
                 (float) functions[1].evaluate(ctx),
                 (float) functions[2].evaluate(ctx)
         );
+    }
+
+    private static MolangContext<?> requireMolangContext(IEvaluationContext ctx) {
+        if (ctx instanceof MolangContext<?> mc) {
+            return mc;
+        }
+        throw new IllegalArgumentException("Molang animation keyframes require a MolangContext, got "
+                + (ctx == null ? "null" : ctx.getClass().getName()));
     }
 }
 
