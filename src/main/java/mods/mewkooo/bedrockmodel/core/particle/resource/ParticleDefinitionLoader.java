@@ -4,7 +4,6 @@ import mods.mewkooo.bedrockmodel.BedrockModelMod;
 import mods.mewkooo.bedrockmodel.core.particle.data.ParticleEffectDefinition;
 import mods.mewkooo.bedrockmodel.core.particle.data.ParticleEffectDeserializer;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleMolangEnvironment;
-import com.google.common.collect.Maps;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import net.minecraft.resources.ResourceLocation;
@@ -19,8 +18,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.Map;
+import java.util.HashMap;
 
 /**
  * 粒子定义资源加载器。
@@ -37,8 +36,15 @@ public class ParticleDefinitionLoader extends SimplePreparableReloadListener<Map
     private static ParticleDefinitionLoader INSTANCE;
 
     private final ParticleMolangEnvironment molang;
-    private final Map<ResourceLocation, ParticleEffectDefinition> cache = Maps.newHashMap();
-    private final Map<ResourceLocation, ParticleEffectDefinition> identifierIndex = Maps.newHashMap();
+    private volatile DefinitionGeneration generation = new DefinitionGeneration(Map.of(), Map.of());
+
+    private record DefinitionGeneration(Map<ResourceLocation, ParticleEffectDefinition> definitions,
+                                        Map<ResourceLocation, ParticleEffectDefinition> identifierIndex) {
+        private DefinitionGeneration {
+            definitions = Map.copyOf(definitions);
+            identifierIndex = Map.copyOf(identifierIndex);
+        }
+    }
 
     public ParticleDefinitionLoader(ParticleMolangEnvironment molang) {
         this.molang = molang;
@@ -55,7 +61,7 @@ public class ParticleDefinitionLoader extends SimplePreparableReloadListener<Map
     @NotNull
     @ParametersAreNonnullByDefault
     protected Map<ResourceLocation, JsonElement> prepare(ResourceManager resourceManager, ProfilerFiller profiler) {
-        Map<ResourceLocation, JsonElement> result = Maps.newHashMap();
+        Map<ResourceLocation, JsonElement> result = new HashMap<>();
         resourceManager.listResources(DIRECTORY, loc -> loc.getPath().endsWith(".json"))
                 .forEach((location, resource) -> {
                     try (InputStream stream = resource.open()) {
@@ -74,13 +80,13 @@ public class ParticleDefinitionLoader extends SimplePreparableReloadListener<Map
     @Override
     @ParametersAreNonnullByDefault
     protected void apply(Map<ResourceLocation, JsonElement> prepared, ResourceManager resourceManager, ProfilerFiller profiler) {
-        cache.clear();
-        identifierIndex.clear();
+        Map<ResourceLocation, ParticleEffectDefinition> definitions = new HashMap<>();
+        Map<ResourceLocation, ParticleEffectDefinition> identifierIndex = new HashMap<>();
         prepared.forEach((id, json) -> {
             try {
                 ParticleEffectDefinition definition = DESERIALIZER.parse(json, molang);
                 if (definition != null) {
-                    cache.put(id, definition);
+                    definitions.put(id, definition);
                     identifierIndex.put(definition.getIdentifier(), definition);
                     BedrockModelMod.LOGGER.debug("Loaded particle definition: {}", id);
                 }
@@ -88,18 +94,20 @@ public class ParticleDefinitionLoader extends SimplePreparableReloadListener<Map
                 BedrockModelMod.LOGGER.error("Failed to parse particle definition: {}", id, e);
             }
         });
-        BedrockModelMod.LOGGER.info("Loaded {} particle definitions", cache.size());
+        generation = new DefinitionGeneration(definitions, identifierIndex);
+        BedrockModelMod.LOGGER.info("Loaded {} particle definitions", definitions.size());
     }
 
     @Nullable
     public ParticleEffectDefinition getDefinition(ResourceLocation id) {
-        ParticleEffectDefinition def = cache.get(id);
+        DefinitionGeneration current = generation;
+        ParticleEffectDefinition def = current.definitions().get(id);
         if (def != null) return def;
-        return identifierIndex.get(id);
+        return current.identifierIndex().get(id);
     }
 
     public Map<ResourceLocation, ParticleEffectDefinition> getAllDefinitions() {
-        return Collections.unmodifiableMap(cache);
+        return generation.definitions();
     }
 
     public ParticleMolangEnvironment getMolang() {

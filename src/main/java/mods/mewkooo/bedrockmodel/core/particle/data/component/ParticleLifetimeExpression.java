@@ -27,7 +27,10 @@ public record ParticleLifetimeExpression(
     @Override
     public void apply(ParticleInstance p) {
         if (p.emitter == null) return;
-        p.maxLifetime = (float) maxLifetime.evaluate(p.emitter.getMolang().getContext());
+        double lifetime = maxLifetime.evaluate(p.emitter.getMolang().getContext());
+        float finiteLifetime = (float) lifetime;
+        p.maxLifetime = Double.isFinite(lifetime) && Float.isFinite(finiteLifetime)
+                ? Math.max(0, finiteLifetime) : 0;
     }
 
     @Override

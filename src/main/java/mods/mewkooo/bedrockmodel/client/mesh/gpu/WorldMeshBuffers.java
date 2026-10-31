@@ -32,6 +32,25 @@ public class WorldMeshBuffers {
     public final VertexBufferPool pool = new VertexBufferPool();
     private long generation;
 
+    interface LightBufferOperations {
+        int currentArrayBuffer();
+        int createBuffer();
+        void bindArrayBuffer(int id);
+        void upload(ByteBuffer data);
+        void deleteBuffer(int id);
+    }
+
+    private static final LightBufferOperations GL_LIGHT_BUFFER_OPERATIONS = new LightBufferOperations() {
+        @Override public int currentArrayBuffer() { return GL11.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING); }
+        @Override public int createBuffer() { return GlStateManager._glGenBuffers(); }
+        @Override public void bindArrayBuffer(int id) { GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER, id); }
+        @Override public void upload(ByteBuffer buffer) {
+            // DYNAMIC_DRAW keeps frequently updated light data in storage suited to repeated writes.
+            RenderSystem.glBufferData(GL15.GL_ARRAY_BUFFER, buffer, GL15.GL_DYNAMIC_DRAW);
+        }
+        @Override public void deleteBuffer(int id) { RenderSystem.glDeleteBuffers(id); }
+    };
+
     public WorldMeshBuffers(WorldMeshMetrics metrics) {
         this.metrics = metrics;
     }
@@ -140,14 +159,26 @@ public class WorldMeshBuffers {
 
     /** 建光照流缓冲（DYNAMIC：会被反复改写，让驱动把它放在适合动态更新的位置）。 */
     public int createLightBuffer(ByteBuffer data) {
-        int previous = GL11.glGetInteger(GL15.GL_ARRAY_BUFFER_BINDING);
-        int id = GlStateManager._glGenBuffers();
-        GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER, id);
-        // DYNAMIC_DRAW：光照会被反复改写，让驱动把它放到适合动态更新的位置。
-        RenderSystem.glBufferData(GL15.GL_ARRAY_BUFFER, data, GL15.GL_DYNAMIC_DRAW);
-        GlStateManager._glBindBuffer(GL15.GL_ARRAY_BUFFER, previous);
-        metrics.recordLightBufferCreated();
-        return id;
+        return createLightBuffer(data, GL_LIGHT_BUFFER_OPERATIONS);
+    }
+
+    int createLightBuffer(ByteBuffer data, LightBufferOperations operations) {
+        int previous = operations.currentArrayBuffer();
+        int id = operations.createBuffer();
+        boolean created = false;
+        try {
+            operations.bindArrayBuffer(id);
+            operations.upload(data);
+            metrics.recordLightBufferCreated();
+            created = true;
+            return id;
+        } finally {
+            try {
+                operations.bindArrayBuffer(previous);
+            } finally {
+                if (!created) operations.deleteBuffer(id);
+            }
+        }
     }
 
     /** 仅上传 MUTABLE 流的脏区间；几何缓冲及其它实例的光照均保持不变。 */

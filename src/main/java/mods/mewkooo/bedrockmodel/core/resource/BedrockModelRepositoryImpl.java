@@ -10,7 +10,6 @@ import mods.mewkooo.bedrockmodel.api.model.BedrockModel;
 import mods.mewkooo.bedrockmodel.core.json.pojo.BedrockModelPOJO;
 import mods.mewkooo.bedrockmodel.core.model.baked.BakedBedrockModel;
 import mods.mewkooo.bedrockmodel.core.model.tree.TreeBedrockModel;
-import com.google.common.collect.Maps;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
@@ -24,10 +23,13 @@ import javax.annotation.ParametersAreNonnullByDefault;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
 
 final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Map<ResourceLocation, Optional<BedrockModelPOJO>>>
@@ -36,11 +38,23 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
 
     private final Map<ResourceLocation, BedrockModelEntry> entries;
     private final List<Consumer<Map<ResourceLocation, BedrockModelResource>>> listeners;
-    private final Map<ResourceLocation, Optional<BedrockModelPOJO>> pojoCache;
-    private final Map<ResourceLocation, Optional<BedrockModelResource>> resourceCache;
     private final BedrockModelFactory modelFactory;
-    @Nullable
-    private ResourceManager resourceManager;
+    private volatile Generation generation = new Generation(Map.of(), Map.of(), null);
+
+    private static final class Generation {
+        private final ConcurrentMap<ResourceLocation, Optional<BedrockModelPOJO>> pojoCache;
+        private final ConcurrentMap<ResourceLocation, Optional<BedrockModelResource>> resourceCache;
+        @Nullable
+        private final ResourceManager resourceManager;
+
+        private Generation(Map<ResourceLocation, Optional<BedrockModelPOJO>> pojos,
+                           Map<ResourceLocation, Optional<BedrockModelResource>> resources,
+                           @Nullable ResourceManager resourceManager) {
+            this.pojoCache = new ConcurrentHashMap<>(pojos);
+            this.resourceCache = new ConcurrentHashMap<>(resources);
+            this.resourceManager = resourceManager;
+        }
+    }
 
     BedrockModelRepositoryImpl(LogicalSide logicalSide,
                            Map<ResourceLocation, BedrockModelEntry> entries,
@@ -49,8 +63,6 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
                            java.util.function.Function<BedrockModelPOJO, ? extends BedrockModel> legacyModelFactory) {
         this.entries = Map.copyOf(entries);
         this.listeners = List.copyOf(listeners);
-        this.pojoCache = Maps.newHashMap();
-        this.resourceCache = Maps.newHashMap();
         this.modelFactory = new BedrockModelFactory(animationSources, legacyModelFactory);
         BedrockResources.install(logicalSide, this);
     }
@@ -59,7 +71,7 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
     @NotNull
     @ParametersAreNonnullByDefault
     protected Map<ResourceLocation, Optional<BedrockModelPOJO>> prepare(ResourceManager resourceManager, ProfilerFiller profiler) {
-        Map<ResourceLocation, Optional<BedrockModelPOJO>> result = Maps.newHashMap();
+        Map<ResourceLocation, Optional<BedrockModelPOJO>> result = new HashMap<>();
         entries.forEach((location, entry) -> {
             if (entry.lazy()) {
                 return;
@@ -72,30 +84,29 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
     @Override
     @ParametersAreNonnullByDefault
     protected void apply(Map<ResourceLocation, Optional<BedrockModelPOJO>> prepared, ResourceManager resourceManager, ProfilerFiller profiler) {
-        this.resourceManager = resourceManager;
-        pojoCache.clear();
-        resourceCache.clear();
-        pojoCache.putAll(prepared);
+        Map<ResourceLocation, Optional<BedrockModelResource>> resources = new ConcurrentHashMap<>();
         entries.forEach((location, entry) -> {
             if (entry.lazy()) {
                 return;
             }
-            Optional<BedrockModelPOJO> pojo = pojoCache.get(location);
+            Optional<BedrockModelPOJO> pojo = prepared.get(location);
             if (pojo == null || pojo.isEmpty()) {
                 return;
             }
-            resourceCache.put(location, modelFactory.create(location, entry, pojo.get()));
+            resources.put(location, modelFactory.create(location, entry, pojo.get()));
         });
-        Map<ResourceLocation, BedrockModelResource> resources = getAllResources();
+        Map<ResourceLocation, BedrockModelResource> listenerResources = resourceMap(resources);
         for (Consumer<Map<ResourceLocation, BedrockModelResource>> listener : listeners) {
-            listener.accept(resources);
+            listener.accept(listenerResources);
         }
+        generation = new Generation(prepared, resources, resourceManager);
     }
 
     @Override
     @Nullable
-    public synchronized BedrockModelResource getResource(ResourceLocation location) {
-        Optional<BedrockModelResource> cached = resourceCache.get(location);
+    public BedrockModelResource getResource(ResourceLocation location) {
+        Generation current = generation;
+        Optional<BedrockModelResource> cached = current.resourceCache.get(location);
         if (cached != null) {
             return cached.orElse(null);
         }
@@ -104,19 +115,16 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
             BedrockModelMod.LOGGER.error("Not registered Bedrock model: {}", location);
             return null;
         }
-        BedrockModelPOJO pojo = getModelPojo(location);
-        if (pojo == null) {
-            resourceCache.put(location, Optional.empty());
-            return null;
-        }
-        Optional<BedrockModelResource> resource = modelFactory.create(location, entry, pojo);
-        resourceCache.put(location, resource);
+        Optional<BedrockModelResource> resource = current.resourceCache.computeIfAbsent(location, key -> {
+            BedrockModelPOJO pojo = getModelPojo(current, key, entry);
+            return pojo == null ? Optional.empty() : modelFactory.create(key, entry, pojo);
+        });
         return resource.orElse(null);
     }
 
 
     @Nullable
-    public synchronized BakedBedrockModel getBakedModel(ResourceLocation location) {
+    public BakedBedrockModel getBakedModel(ResourceLocation location) {
         BedrockModelResource resource = getResource(location);
         if (resource == null || resource.kind() != ModelType.BAKED) {
             return null;
@@ -125,7 +133,7 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
     }
 
     @Nullable
-    public synchronized BedrockModel getLegacyModel(ResourceLocation location) {
+    public BedrockModel getLegacyModel(ResourceLocation location) {
         BedrockModelResource resource = getResource(location);
         if (resource == null || resource.kind() != ModelType.LEGACY) {
             return null;
@@ -134,7 +142,7 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
     }
 
     @Nullable
-    public synchronized TreeBedrockModel getTreeModel(ResourceLocation location) {
+    public TreeBedrockModel getTreeModel(ResourceLocation location) {
         BedrockModelResource resource = getResource(location);
         if (resource == null || resource.kind() != ModelType.TREE) {
             return null;
@@ -143,40 +151,52 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
     }
 
     @Nullable
-    public synchronized BedrockModelPOJO getModelPojo(ResourceLocation location) {
-        Optional<BedrockModelPOJO> cached = pojoCache.get(location);
+    public BedrockModelPOJO getModelPojo(ResourceLocation location) {
+        Generation current = generation;
+        return getModelPojo(current, location, entries.get(location));
+    }
+
+    private BedrockModelPOJO getModelPojo(Generation current, ResourceLocation location, BedrockModelEntry entry) {
+        Optional<BedrockModelPOJO> cached = current.pojoCache.get(location);
         if (cached != null) {
             return cached.orElse(null);
         }
-        BedrockModelEntry entry = entries.get(location);
         if (entry == null) {
             BedrockModelMod.LOGGER.error("Not registered Bedrock model: {}", location);
             return null;
         }
-        if (resourceManager == null) {
-            BedrockModelMod.LOGGER.error("Cannot lazy load Bedrock model before resource reload is applied: {}", location);
-            return null;
-        }
-        Optional<BedrockModelPOJO> pojo = loadModelPojo(resourceManager, entry);
-        pojoCache.put(location, pojo);
+        Optional<BedrockModelPOJO> pojo = current.pojoCache.computeIfAbsent(location, key -> {
+            if (current.resourceManager == null) {
+                BedrockModelMod.LOGGER.error("Cannot lazy load Bedrock model before resource reload is applied: {}", key);
+                return Optional.empty();
+            }
+            return loadModelPojo(current.resourceManager, entry);
+        });
         return pojo.orElse(null);
     }
 
-    public synchronized void clearLoaded(ResourceLocation location) {
-        pojoCache.remove(location);
-        resourceCache.remove(location);
+    public void clearLoaded(ResourceLocation location) {
+        Generation current = generation;
+        current.pojoCache.remove(location);
+        current.resourceCache.remove(location);
     }
 
-    public synchronized void clearLoaded() {
-        pojoCache.clear();
-        resourceCache.clear();
+    public void clearLoaded() {
+        Generation current = generation;
+        current.pojoCache.clear();
+        current.resourceCache.clear();
     }
 
     @Override
     @UnmodifiableView
     public Map<ResourceLocation, BedrockModelResource> getAllResources() {
+        return resourceMap(generation.resourceCache);
+    }
+
+    private static Map<ResourceLocation, BedrockModelResource> resourceMap(
+            Map<ResourceLocation, Optional<BedrockModelResource>> cache) {
         Map<ResourceLocation, BedrockModelResource> result = new LinkedHashMap<>();
-        for (Map.Entry<ResourceLocation, Optional<BedrockModelResource>> entry : resourceCache.entrySet()) {
+        for (Map.Entry<ResourceLocation, Optional<BedrockModelResource>> entry : cache.entrySet()) {
             entry.getValue().ifPresent(resource -> result.put(entry.getKey(), resource));
         }
         return Collections.unmodifiableMap(result);
@@ -206,7 +226,7 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
 
     @UnmodifiableView
     public Map<ResourceLocation, Optional<BedrockModelPOJO>> getModelPojos() {
-        return Collections.unmodifiableMap(pojoCache);
+        return Map.copyOf(generation.pojoCache);
     }
 
     private static Optional<BedrockModelPOJO> loadModelPojo(ResourceManager resourceManager, BedrockModelEntry processor) {

@@ -44,12 +44,13 @@ public class SnowStormParticle extends TextureSheetParticle {
     // 锚点跟随：发射器启用 followAnchor 时，粒子保存锚点局部坐标，
     // 渲染时用发射器当前 worldTransform（含旋转+平移）重新求世界坐标——位置与朝向均跟随锚点
     private final boolean followAnchor;
-    private final float localX;
-    private final float localY;
-    private final float localZ;
+    private float localX;
+    private float localY;
+    private float localZ;
 
     // 锚点跟随渲染用的临时世界坐标
     private static final Vector3f FOLLOW_POS = new Vector3f();
+    private static final Matrix4f FOLLOW_INVERSE = new Matrix4f();
 
     // billboard 朝向模式
     private final ParticleAppearanceBillboard.FaceCameraMode faceCameraMode;
@@ -159,6 +160,9 @@ public class SnowStormParticle extends TextureSheetParticle {
 
     @Override
     public void tick() {
+        if (followAnchor && !particleData.parametricPosition) {
+            reanchorForTick();
+        }
         this.xo = this.x;
         this.yo = this.y;
         this.zo = this.z;
@@ -182,6 +186,14 @@ public class SnowStormParticle extends TextureSheetParticle {
                     particleData.z - (float) this.z);
         } else {
             this.move(this.xd, this.yd, this.zd);
+        }
+
+        if (followAnchor) {
+            FOLLOW_INVERSE.set(emitter.getWorldTransform()).invert();
+            FOLLOW_INVERSE.transformPosition((float) this.x, (float) this.y, (float) this.z, FOLLOW_POS);
+            localX = FOLLOW_POS.x;
+            localY = FOLLOW_POS.y;
+            localZ = FOLLOW_POS.z;
         }
 
         particleData.vx = (float) this.xd * 20f;
@@ -216,6 +228,18 @@ public class SnowStormParticle extends TextureSheetParticle {
     public void remove() {
         super.remove();
         emitter.releaseExternalParticle(particleData);
+    }
+
+    private void reanchorForTick() {
+        emitter.getWorldTransform().transformPosition(localX, localY, localZ, FOLLOW_POS);
+        double dx = FOLLOW_POS.x - this.x;
+        double dy = FOLLOW_POS.y - this.y;
+        double dz = FOLLOW_POS.z - this.z;
+        this.setBoundingBox(this.getBoundingBox().move(dx, dy, dz));
+        this.setLocationFromBoundingbox();
+        particleData.x = (float) this.x;
+        particleData.y = (float) this.y;
+        particleData.z = (float) this.z;
     }
 
     @Override
@@ -272,7 +296,7 @@ public class SnowStormParticle extends TextureSheetParticle {
             emitter.fireCollisionEvents(particleData, speed);
 
             if (expireOnContact) {
-                this.remove();
+                particleData.alive = false;
             }
         }
     }

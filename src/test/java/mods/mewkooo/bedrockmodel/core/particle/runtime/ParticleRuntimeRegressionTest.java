@@ -5,11 +5,14 @@ import mods.mewkooo.bedrockmodel.core.particle.data.ParticleEffectDefinition;
 import mods.mewkooo.bedrockmodel.core.molang.runtime.MolangExpression;
 import mods.mewkooo.bedrockmodel.core.particle.data.component.IComponent;
 import mods.mewkooo.bedrockmodel.core.particle.data.component.ParticleLifetimeEvents;
+import mods.mewkooo.bedrockmodel.core.particle.data.component.EmitterLifetimeEvents;
+import mods.mewkooo.bedrockmodel.core.particle.data.component.ParticleLifetimeExpression;
 import mods.mewkooo.bedrockmodel.core.particle.data.component.motion.ParticleMotionParametric;
 import mods.mewkooo.bedrockmodel.core.particle.data.component.rate.EmitterRateSteady;
 import mods.mewkooo.bedrockmodel.core.particle.data.event.EventSequence;
 import mods.mewkooo.bedrockmodel.core.particle.data.event.IEventNode;
 import mods.mewkooo.bedrockmodel.core.particle.data.event.SoundEffectEvent;
+import mods.mewkooo.bedrockmodel.core.molang.runtime.value.NumberValue;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
@@ -19,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -134,6 +138,51 @@ class ParticleRuntimeRegressionTest {
         nodes.add(recursive);
 
         assertDoesNotThrow(() -> EventExecutor.execute(recursive, null));
+    }
+
+    @Test
+    void invalidLoopingTravelDistancesDoNotFireRepeatedly() {
+        ParticleMolangEnvironment molang = new ParticleMolangEnvironment();
+        EmitterLifetimeEvents events = new EmitterLifetimeEvents(List.of(), List.of(), new TreeMap<>(), new TreeMap<>(),
+                List.of(new EmitterLifetimeEvents.LoopingTravelDistanceEvent(0, List.of("loop")),
+                        new EmitterLifetimeEvents.LoopingTravelDistanceEvent(-1, List.of("loop")),
+                        new EmitterLifetimeEvents.LoopingTravelDistanceEvent(Float.NaN, List.of("loop")),
+                        new EmitterLifetimeEvents.LoopingTravelDistanceEvent(1, List.of("loop"))));
+        AtomicInteger fired = new AtomicInteger();
+        ParticleEmitterInstance emitter = emitter(List.of(events), molang,
+                Map.of("loop", List.of(new SoundEffectEvent("test:loop"))));
+        emitter.setEventContext(new EventExecutor.EventContext(emitter, molang, new ParticleEventSink() {
+            @Override
+            public void spawnParticle(ResourceLocation effectId, Vec3 position) {}
+
+            @Override
+            public void playSound(ResourceLocation soundId, Vec3 position) {
+                fired.incrementAndGet();
+            }
+        }, Vec3.ZERO));
+        emitter.setEmitterTransform(new Matrix4f(), new Matrix4f());
+        emitter.tick(1f / 20f);
+        emitter.setEmitterTransform(new Matrix4f(), new Matrix4f().translation(2, 0, 0));
+        emitter.tick(1f / 20f);
+        emitter.tick(1f / 20f);
+
+        assertEquals(1, fired.get(), "Only the valid one-block threshold should fire once");
+    }
+
+    @Test
+    void nonFiniteMolangLifetimeExpiresImmediately() {
+        ParticleMolangEnvironment molang = new ParticleMolangEnvironment();
+        var expression = molang.compile("math.exp(v.emitter_age)");
+        ParticleEmitterInstance emitter = emitter(List.of(), molang);
+        molang.bindEmitter(1000, 0, 0, 0, 0, 0);
+        assertFalse(Double.isFinite(expression.evaluate(molang.getContext())), "The fixture must produce infinity");
+        ParticleInstance particle = new ParticleInstance();
+        particle.emitter = emitter;
+        new ParticleLifetimeExpression(expression, null).apply(particle);
+        particle.tick(1f / 20f);
+
+        assertEquals(0, particle.maxLifetime);
+        assertFalse(particle.alive);
     }
 
     private static MolangExpression[] expressions(ParticleMolangEnvironment molang, String x, String y, String z) {

@@ -1,5 +1,6 @@
 package mods.mewkooo.bedrockmodel.core.particle.data.component;
 
+import mods.mewkooo.bedrockmodel.BedrockModelMod;
 import mods.mewkooo.bedrockmodel.core.particle.data.ParticleEffectDefinition;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.EventExecutor;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleEmitterInstance;
@@ -117,7 +118,9 @@ public record EmitterLifetimeEvents(
             // looping_travel_distance_events
             for (int i = 0; i < loopingTravelDistanceEvents.size(); i++) {
                 LoopingTravelDistanceEvent loopEvent = loopingTravelDistanceEvents.get(i);
-                if (travelDistance - loopingTravelDistAccum[i] >= loopEvent.distance()) {
+                float distance = loopEvent.distance();
+                if (Float.isFinite(distance) && distance > 0
+                        && travelDistance - loopingTravelDistAccum[i] >= distance) {
                     loopingTravelDistAccum[i] = travelDistance;
                     EventExecutor.fireEvents(loopEvent.effects(), def, ctx);
                 }
@@ -210,6 +213,10 @@ public record EmitterLifetimeEvents(
         for (JsonElement elem : arr) {
             JsonObject entry = elem.getAsJsonObject();
             float distance = entry.has("distance") ? entry.get("distance").getAsFloat() : 1f;
+            if (!Float.isFinite(distance) || distance <= 0) {
+                BedrockModelMod.LOGGER.warn("Ignoring looping travel distance event with invalid distance: {}", distance);
+                continue;
+            }
             List<String> effects = new ArrayList<>();
             if (entry.has("effects")) {
                 for (JsonElement e : entry.getAsJsonArray("effects")) effects.add(e.getAsString());

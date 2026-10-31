@@ -23,6 +23,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -80,6 +86,101 @@ class ServerModelResourcesTest {
         assertEquals("root", server.getGeometryModelNew().getBones()[0].getName());
         assertNull(server.getGeometryModelNew().getBones()[0].getCubes());
         assertEquals(1, client.getGeometryModelNew().getBones()[0].getCubes().length);
+    }
+
+    @Test
+    void listenerFailureLeavesThePreviousGenerationPublished() {
+        AtomicBoolean failListener = new AtomicBoolean();
+        var loader = RawResourceLoaders.forLogicalSide(LogicalSide.SERVER);
+        var animationSources = new BedrockAnimationSourceRepository(Map.of());
+        var repository = new BedrockModelRepositoryImpl(LogicalSide.SERVER,
+                Map.of(ID, new BedrockModelEntry(loader, ID, ModelType.TREE,
+                        BedrockModelBakeContext::optionsFromAnimations, List.of(), false)),
+                List.of(resources -> {
+                    if (failListener.get()) throw new IllegalStateException("listener failure");
+                }), animationSources, null);
+        ResourceManager manager = new MemoryResources(Map.of(path("models/bedrock/"), MODEL));
+        var prepared = repository.prepare(manager, InactiveProfiler.INSTANCE);
+        repository.apply(prepared, manager, InactiveProfiler.INSTANCE);
+        var previous = repository.getResource(ID);
+        assertNotNull(previous);
+
+        failListener.set(true);
+        assertThrows(IllegalStateException.class,
+                () -> repository.apply(Map.of(ID, Optional.empty()), manager, InactiveProfiler.INSTANCE));
+
+        assertSame(previous, repository.getResource(ID));
+        assertEquals(Map.of(ID, previous), repository.getAllResources());
+    }
+
+    @Test
+    void successfulReloadWithMissingAssetRemovesTheModel() {
+        var loader = RawResourceLoaders.forLogicalSide(LogicalSide.SERVER);
+        var repository = new BedrockModelRepositoryImpl(LogicalSide.SERVER,
+                Map.of(ID, new BedrockModelEntry(loader, ID, ModelType.TREE,
+                        BedrockModelBakeContext::optionsFromAnimations, List.of(), false)),
+                List.of(), new BedrockAnimationSourceRepository(Map.of()), null);
+        ResourceManager manager = new MemoryResources(Map.of(path("models/bedrock/"), MODEL));
+        repository.apply(repository.prepare(manager, InactiveProfiler.INSTANCE), manager, InactiveProfiler.INSTANCE);
+        assertNotNull(repository.getResource(ID));
+
+        ResourceManager emptyManager = new MemoryResources(Map.of());
+        repository.apply(repository.prepare(emptyManager, InactiveProfiler.INSTANCE), emptyManager, InactiveProfiler.INSTANCE);
+
+        assertNull(repository.getResource(ID));
+        assertTrue(repository.getAllResources().isEmpty());
+    }
+
+    @Test
+    void concurrentReloadReadersObserveACompletePreviousGeneration() throws Exception {
+        ResourceLocation secondId = ResourceLocation.fromNamespaceAndPath("test", "second_model");
+        AtomicBoolean pauseSecondBake = new AtomicBoolean();
+        AtomicInteger bakeCount = new AtomicInteger();
+        CountDownLatch secondBakeStarted = new CountDownLatch(1);
+        CountDownLatch finishSecondBake = new CountDownLatch(1);
+        var loader = RawResourceLoaders.forLogicalSide(LogicalSide.SERVER);
+        var options = (java.util.function.Function<BedrockModelBakeContext, mods.mewkooo.bedrockmodel.api.model.BakerOptions>) context -> {
+            if (pauseSecondBake.get() && bakeCount.incrementAndGet() == 2) {
+                secondBakeStarted.countDown();
+                try {
+                    if (!finishSecondBake.await(5, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("timed out waiting to finish the second model bake");
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException(e);
+                }
+            }
+            return mods.mewkooo.bedrockmodel.api.model.BakerOptions.defaults();
+        };
+        var entries = Map.of(
+                ID, new BedrockModelEntry(loader, ID, ModelType.BAKED, options, List.of(), false),
+                secondId, new BedrockModelEntry(loader, ID, ModelType.BAKED, options, List.of(), false));
+        var repository = new BedrockModelRepositoryImpl(LogicalSide.SERVER, entries, List.of(),
+                new BedrockAnimationSourceRepository(Map.of()), null);
+        ResourceManager manager = new MemoryResources(Map.of());
+        var pojo = Optional.of(parse(LogicalSide.SERVER));
+        Map<ResourceLocation, Optional<BedrockModelPOJO>> prepared = Map.of(ID, pojo, secondId, pojo);
+        repository.apply(prepared, manager, InactiveProfiler.INSTANCE);
+        Map<ResourceLocation, mods.mewkooo.bedrockmodel.api.resource.BedrockModelResource> previous = repository.getAllResources();
+        assertEquals(2, previous.size());
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            pauseSecondBake.set(true);
+            var reload = executor.submit(() -> repository.apply(prepared, manager, InactiveProfiler.INSTANCE));
+            assertTrue(secondBakeStarted.await(5, TimeUnit.SECONDS));
+            Map<ResourceLocation, mods.mewkooo.bedrockmodel.api.resource.BedrockModelResource> snapshot = repository.getAllResources();
+            assertEquals(2, snapshot.size());
+            assertSame(previous.get(ID), snapshot.get(ID));
+            assertSame(previous.get(secondId), snapshot.get(secondId));
+            finishSecondBake.countDown();
+            reload.get(5, TimeUnit.SECONDS);
+            assertEquals(2, repository.getAllResources().size());
+        } finally {
+            finishSecondBake.countDown();
+            executor.shutdownNow();
+        }
     }
 
     private static BedrockModelPOJO parse(LogicalSide side) {

@@ -2,7 +2,6 @@ package mods.mewkooo.bedrockmodel.core.resource;
 
 import mods.mewkooo.bedrockmodel.BedrockModelMod;
 import mods.mewkooo.bedrockmodel.core.json.pojo.BedrockAnimationFile;
-import com.google.common.collect.Maps;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
@@ -14,26 +13,37 @@ import org.jetbrains.annotations.UnmodifiableView;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 final class BedrockAnimationSourceRepository extends SimplePreparableReloadListener<Map<ResourceLocation, Optional<BedrockAnimationFile>>> {
     private final Map<ResourceLocation, BedrockAnimationEntry> processors;
-    private final Map<ResourceLocation, Optional<BedrockAnimationFile>> fileCache;
-    @Nullable
-    private ResourceManager resourceManager;
+    private volatile Generation generation = new Generation(Map.of(), null);
+
+    private static final class Generation {
+        private final ConcurrentMap<ResourceLocation, Optional<BedrockAnimationFile>> fileCache;
+        @Nullable
+        private final ResourceManager resourceManager;
+
+        private Generation(Map<ResourceLocation, Optional<BedrockAnimationFile>> files,
+                           @Nullable ResourceManager resourceManager) {
+            this.fileCache = new ConcurrentHashMap<>(files);
+            this.resourceManager = resourceManager;
+        }
+    }
 
     BedrockAnimationSourceRepository(Map<ResourceLocation, BedrockAnimationEntry> processors) {
         this.processors = Map.copyOf(processors);
-        this.fileCache = Maps.newHashMap();
     }
 
     @Override
     @NotNull
     @ParametersAreNonnullByDefault
     protected Map<ResourceLocation, Optional<BedrockAnimationFile>> prepare(ResourceManager resourceManager, ProfilerFiller profiler) {
-        Map<ResourceLocation, Optional<BedrockAnimationFile>> result = Maps.newHashMap();
+        Map<ResourceLocation, Optional<BedrockAnimationFile>> result = new HashMap<>();
         processors.forEach((location, processor) -> {
             if (processor.lazy()) {
                 return;
@@ -46,14 +56,13 @@ final class BedrockAnimationSourceRepository extends SimplePreparableReloadListe
     @Override
     @ParametersAreNonnullByDefault
     protected void apply(Map<ResourceLocation, Optional<BedrockAnimationFile>> prepared, ResourceManager resourceManager, ProfilerFiller profiler) {
-        this.resourceManager = resourceManager;
-        fileCache.clear();
-        fileCache.putAll(prepared);
+        generation = new Generation(prepared, resourceManager);
     }
 
     @Nullable
-    synchronized BedrockAnimationFile getAnimationFile(ResourceLocation location) {
-        Optional<BedrockAnimationFile> cached = fileCache.get(location);
+    BedrockAnimationFile getAnimationFile(ResourceLocation location) {
+        Generation current = generation;
+        Optional<BedrockAnimationFile> cached = current.fileCache.get(location);
         if (cached != null) {
             return cached.orElse(null);
         }
@@ -62,12 +71,13 @@ final class BedrockAnimationSourceRepository extends SimplePreparableReloadListe
             BedrockModelMod.LOGGER.error("Not registered Bedrock animation: {}", location);
             return null;
         }
-        if (resourceManager == null) {
-            BedrockModelMod.LOGGER.error("Cannot lazy load Bedrock animation before resource reload is applied: {}", location);
-            return null;
-        }
-        Optional<BedrockAnimationFile> file = loadAnimationFile(resourceManager, location, processor);
-        fileCache.put(location, file);
+        Optional<BedrockAnimationFile> file = current.fileCache.computeIfAbsent(location, key -> {
+            if (current.resourceManager == null) {
+                BedrockModelMod.LOGGER.error("Cannot lazy load Bedrock animation before resource reload is applied: {}", key);
+                return Optional.empty();
+            }
+            return loadAnimationFile(current.resourceManager, key, processor);
+        });
         return file.orElse(null);
     }
 
@@ -76,17 +86,17 @@ final class BedrockAnimationSourceRepository extends SimplePreparableReloadListe
         return processors.get(location);
     }
 
-    synchronized void clearLoaded(ResourceLocation location) {
-        fileCache.remove(location);
+    void clearLoaded(ResourceLocation location) {
+        generation.fileCache.remove(location);
     }
 
-    synchronized void clearLoaded() {
-        fileCache.clear();
+    void clearLoaded() {
+        generation.fileCache.clear();
     }
 
     @UnmodifiableView
     Map<ResourceLocation, Optional<BedrockAnimationFile>> getAllAnimationFiles() {
-        return Collections.unmodifiableMap(fileCache);
+        return Map.copyOf(generation.fileCache);
     }
 
     private static Optional<BedrockAnimationFile> loadAnimationFile(ResourceManager resourceManager, ResourceLocation location,

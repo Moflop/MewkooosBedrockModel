@@ -38,9 +38,15 @@ public class InstanceMeshBatches<K> {
         resident.light = light;
         GeometryCache.Entry active = resident.active;
         if (active != null && active.key.equals(geometryKey)) {
-            if (resident.pending != null) resident.pending.release();
-            resident.pending = null;
-            return;
+            if (active.ready() && !active.handles().isEmpty()) {
+                if (resident.pending != null) resident.pending.release();
+                resident.pending = null;
+                return;
+            }
+            if (active.handles().isEmpty()) return;
+            active.release();
+            resident.active = null;
+            resident.worldBounds.clear();
         }
         GeometryCache.Entry current = resident.pending;
         if (current != null && current.key.equals(geometryKey)) return;
