@@ -4,6 +4,8 @@
 
 `ItemDisplayTransform(s)` 是 `api.model.display` 下的公共模型元数据类型。解析器先把 JSON 读入独立的 `core.json.pojo.ItemDisplayTransformsData`，再由 `core.json.mapping.ItemDisplayTransformsMapper` 转换成 API 值对象；两侧不共享数据类，JSON 字段名只由 `core.json` 处理。
 
+共享数据与客户端操作分别归属：`api.model.display` 可供两侧读取，不引用渲染类型；`api.client.display.BedrockDisplayTransforms` 是客户端专属的公共工具，负责将数据应用到渲染姿态。通用模型接口不依赖客户端 API。
+
 ## JSON 位置
 
 `item_display_transforms` 与 `description`、`bones` 同级，位于 `minecraft:geometry` 数组中的几何对象内：
@@ -44,7 +46,7 @@
 
 ## 读取参数
 
-以已加载的 `TreeBedrockModel model` 为例，另外两种模型使用相同的入口：
+以已加载的 `api.model.BedrockModel model` 为例，各种模型表示使用相同的入口：
 
 ```java
 import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransform;
@@ -75,18 +77,20 @@ if (gui != null) {
 
 ## 应用变换与中性默认值
 
-`BedrockDisplayTransforms.applyDisplayTransform()` 会将变换应用到当前 `PoseStack`。整个视角没有设置时使用传入的 `defaults`；视角存在时，仅用 `defaults` 补齐缺失的平移、旋转和缩放。调用方负责压栈、出栈、模型对齐及 GUI 自动适配。
+`api.client.display.BedrockDisplayTransforms.applyDisplayTransform()` 会将变换应用到当前 `PoseStack`，应在客户端渲染线程调用，并放在客户端隔离的调用类中。整个视角没有设置时使用传入的 `defaults`；视角存在时，仅用 `defaults` 补齐缺失的平移、旋转和缩放。调用方负责压栈、出栈、模型对齐及 GUI 自动适配。
 
 需要中性默认值时，可以使用公共常量 `ItemDisplayTransform.NONE`：
 
 ```java
-import mods.mewkooo.bedrockmodel.api.model.display.BedrockDisplayTransforms;
+import mods.mewkooo.bedrockmodel.api.client.display.BedrockDisplayTransforms;
 import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransform;
 
 BedrockDisplayTransforms.applyDisplayTransform(
         poseStack, model.getItemDisplayTransforms(), context,
         ItemDisplayTransform.NONE);
 ```
+
+从旧包迁移时，将工具类的 import 从 `api.model.display.BedrockDisplayTransforms` 改为 `api.client.display.BedrockDisplayTransforms`；方法和参数保持不变，两个共享数据类型的 import 也保持不变。旧包路径不提供兼容包装。
 
 该常量的旋转、平移和两个 pivot 均为零，缩放为 `[1, 1, 1]`，`fit_to_frame` 为 `false`。向量 getter 返回副本，因此可以安全共享该常量。它表示单个中性变换；`ItemDisplayTransforms.NONE` 则表示没有任何视角条目的空集合。JSON 中未设置的字段仍保持上述解析语义。
 

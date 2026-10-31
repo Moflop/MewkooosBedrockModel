@@ -1,12 +1,18 @@
-package mods.mewkooo.bedrockmodel.api.model.display;
+package mods.mewkooo.bedrockmodel.api.client.display;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransform;
+import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransforms;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
+/**
+ * Client-only utility for applying shared model display metadata to a render pose.
+ * Call from client rendering code on the render thread.
+ */
 @OnlyIn(Dist.CLIENT)
 public final class BedrockDisplayTransforms {
 	private static final float DEG_TO_RAD = (float) (Math.PI / 180.0);

@@ -9,7 +9,7 @@
 ```groovy
 repositories { mavenLocal() }
 dependencies {
-    implementation("mods.mewkooo.bedrockmodel:mewkooos_bedrock_model:1.0.0-neoforge-mc1.21.1")
+    implementation("mods.mewkooo.bedrockmodel:mewkooos_bedrock_model:1.0.2-neoforge-mc1.21.1")
 }
 ```
 
@@ -97,13 +97,18 @@ public final class ExampleRenderer {
 
 | 包 | 职责 | 依赖方向 |
 | --- | --- | --- |
-| `api` | 下游唯一入口：资源注册事件、模型类型、烘焙选项、显示变换和动画片段契约 | 只依赖 Minecraft/Java 与稳定数据契约，不引用 `core`、`client` 或 `server` |
-| `core.resource` | JSON 路径、reload listener、缓存和模型装配；把 API 注册描述转换为内部 Entry | 依赖 `api` 和共享实现 |
+| `api.model`、`api.animation`、`api.resource` | 两侧共享的公共契约：模型类型、烘焙选项、显示元数据、动画片段、资源注册和查询 | 不依赖侧专属 API 或本库内部实现 |
+| `api.client.display` | 客户端公共工具：将共享显示元数据应用到 `PoseStack` | 依赖通用 API 与客户端渲染类型，不依赖本库内部实现；只在客户端使用 |
+| `core.resource` | JSON 路径、reload listener、缓存和模型装配；把 API 注册描述转换为内部 Entry | 依赖通用 API 和共享实现 |
 | `core.json`、`core.molang` | Bedrock JSON 解析、序列化和 Molang 求值 | 共享实现；不依赖 `client` 或 `server` |
-| `core.model`、`core.particle` | 共享模型数据、烘焙、运行时状态和粒子模拟 | 依赖 `api`；粒子副作用通过 sink 注入 |
+| `core.model`、`core.particle` | 共享模型数据、烘焙、运行时状态和粒子模拟 | 依赖通用 API，不依赖 `api.client`；粒子副作用通过 sink 注入 |
 | `client.model.render` | 共享模型的客户端渲染适配器、顶点写入和 GPU 加速后端 | 依赖 `core.model` 与 `api`，只在客户端加载 |
 | `client.mesh`、`client.particle`、`client.legacy` | 网格/GPU、客户端事件、粒子世界实体和旧渲染器适配 | 依赖 `core` 与 `api`，只在客户端加载 |
-| `server` | 逻辑端 reload 装配，覆盖专用服务器和单人游戏内置服务器 | 依赖 `core` 与 `api`，不加载客户端类型 |
+| `server` | 逻辑端 reload 装配，覆盖专用服务器和单人游戏内置服务器 | 依赖 `core` 与通用 API，不依赖 `api.client` 或客户端实现 |
+
+目前没有服务端专属的公共契约，因此不创建空的 `api.server`。新增此类契约时应放入 `api.server`，覆盖专用服务器和集成服务器；两侧共享的契约仍按功能放在 `api.model`、`api.animation` 或 `api.resource`。依赖方向为 `api.client`/`api.server` → 通用 API，各 API 包都不依赖本库内部实现。
+
+显示变换的数据与操作分开：`api.model.display.ItemDisplayTransform(s)` 是共享模型返回的不可变元数据；`api.client.display.BedrockDisplayTransforms` 是客户端渲染工具。用法见 [显示变换说明](item-display-transforms.md)。包名只表达使用边界，统一的 `RegisterBedrockResourcesEvent` 仍放在 `api.resource`，订阅方仍需检查 `getLogicalSide()`。
 
 注册流程是“`api.resource.RegisterBedrockResourcesEvent` 声明 → `core.resource` 读取 JSON → 构造共享模型/动画 → `api.resource.BedrockResources` 查询 → `client.model.render` 渲染”。新增 JSON 字段放在 `core.json.pojo` 和对应 serializer；新增共享模型算法放在 `core.model`；客户端绘制、GPU 上传和第三方适配放在 `client`；服务端 reload 装配放在 `server`。整个项目仍为单一 Gradle 模块。
 
@@ -114,15 +119,16 @@ public final class ExampleRenderer {
 - 注册事件分别为逻辑客户端和逻辑服务端仓库触发，集成服务器的 `getDist()` 也是 `Dist.CLIENT`。客户端资源和回调使用 `getLogicalSide() == LogicalSide.CLIENT` 筛选；通用订阅类不要提前引用 `net.minecraft.client` 类型。
 - 客户端 reload 注册会额外挂载 `ParticleDefinitionLoader`；逻辑服务端 listener 同时覆盖专用服务器和单人游戏内置服务器，只挂载模型和动画 listener。
 - 模型资源 listener 必须在动画源 listener 之后注册；不要在 reload apply 之前查询 lazy 资源。
-- `client.mesh`、渲染器、GPU 上传和 `PoseStack` 绘制只能在客户端渲染线程执行。
+- `api.client` 只能从客户端隔离的调用类中引用；`api.client.display.BedrockDisplayTransforms`、`client.mesh`、渲染器、GPU 上传和 `PoseStack` 绘制应在客户端渲染线程执行。
 - `BedrockModelInstance` 和模型定义属于共享状态；一般绘制使用 `client.model.render.BedrockModelRenderer`，它分派库内 tree/baked 实例。需要单独绘制骨骼、几何 pass 或扩展渲染参数时，使用 `TreeModelRenderer` 或 `BakedModelRenderer`。legacy 模型仍由客户端 `BedrockModel` 实现及其旧渲染路径处理；它不是 `AnimatedBedrockModel`。
 - Molang 扩展函数绑定中的反射、Mixin、ResourceLocation 和 JSON/存档/网络格式没有随本次包调整改变。客户端配置由模组入口直接注册为 `CLIENT` 类型；移动包名属于开发阶段的破坏性 API 重构，旧 `v1`/`v2` import 不再提供兼容包装。
 
 ## 验证
 
 ```powershell
-./gradlew compileJava compileTestJava
-./gradlew test --rerun-tasks
+./gradlew clean test jar sourcesJar
 ```
 
-`compileJava compileTestJava` 检查源码和测试接入；`test` 覆盖 Molang、JSON、模型烘焙和网格单元测试。本轮还实际运行了 `runServer` 并启动到 `Done`，以及 `runClient` 并完成客户端资源重载；客户端日志中的可选模组、Mixin 版本和音效/着色器提示来自开发环境，没有发现本库启动异常。
+`test` 编译源码和测试接入，覆盖 Molang、JSON、资源注册、显示变换、模型烘焙和网格单元测试；`jar sourcesJar` 生成发布包和源码包。
+
+本次 API 运行侧分包在修改前后均通过 166 项测试，并完成清理构建。产物检查确认工具类只存在于 `api.client.display`，源码包与之对应；`jdeps` 静态检查确认通用 API 不依赖侧专属 API，各 API 不依赖本库内部实现，`core` 与 `server` 不依赖客户端类型。本次未重新运行 Minecraft 客户端、专用服务器或单人游戏集成服务器；单元测试和静态依赖检查不代表这些运行场景已验证。
