@@ -18,12 +18,18 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.event.level.LevelEvent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 // 用来管理世界中的粒子发射器
 @OnlyIn(Dist.CLIENT)
@@ -34,6 +40,7 @@ public class WorldEmitterManager {
     private static WorldEmitterManager INSTANCE;
 
     private final List<ActiveWorldEmitter> emitters = new ArrayList<>();
+    private final Map<ClientLevel, Set<ParticleEmitterInstance>> externalEmitters = new IdentityHashMap<>();
 
     public static WorldEmitterManager getInstance() {
         if (INSTANCE == null) {
@@ -86,6 +93,8 @@ public class WorldEmitterManager {
         emitter.setExternalParticleManagement(particle -> deliverParticle(active, particle));
 
         emitters.add(active);
+        externalEmitters.computeIfAbsent(level, ignored ->
+                Collections.newSetFromMap(new IdentityHashMap<>())).add(emitter);
         return emitter;
     }
 
@@ -102,6 +111,13 @@ public class WorldEmitterManager {
         getInstance().clear();
     }
 
+    @SubscribeEvent
+    public static void onLevelUnload(LevelEvent.Unload event) {
+        if (event.getLevel() instanceof ClientLevel level) {
+            getInstance().onLevelUnload(level);
+        }
+    }
+
     /**
      * 每 tick 驱动所有发射器。
      * <p>
@@ -115,6 +131,9 @@ public class WorldEmitterManager {
 
             // 检查世界是否仍然有效
             if (active.level != Minecraft.getInstance().level) {
+                active.emitter.discard();
+                active.emitter.releaseAllExternalParticles();
+                untrackEmitter(active.level, active.emitter);
                 emitters.remove(i);
                 continue;
             }
@@ -133,6 +152,7 @@ public class WorldEmitterManager {
 
             if (active.emitter.isFinished()) {
                 emitters.remove(i);
+                untrackEmitter(active.level, active.emitter);
             }
         }
     }
@@ -251,9 +271,48 @@ public class WorldEmitterManager {
 
     /**
      * 清空所有发射器。
+     * 外部粒子继续由客户端粒子引擎按各自生命周期管理。
      */
     public void clear() {
+        for (ActiveWorldEmitter active : emitters) {
+            active.emitter.discard();
+            if (active.emitter.getParticleCount() == 0) {
+                untrackEmitter(active.level, active.emitter);
+            }
+        }
         emitters.clear();
+    }
+
+    private void onLevelUnload(ClientLevel level) {
+        Set<ParticleEmitterInstance> levelEmitters = externalEmitters.remove(level);
+        if (levelEmitters != null) {
+            for (ParticleEmitterInstance emitter : levelEmitters) {
+                emitter.discard();
+                emitter.releaseAllExternalParticles();
+            }
+        }
+        emitters.removeIf(active -> active.level == level);
+    }
+
+    void onParticleRemoved(ParticleEmitterInstance emitter, ParticleInstance particle) {
+        emitter.releaseExternalParticle(particle);
+        if (!emitter.isFinished()) return;
+
+        Iterator<Map.Entry<ClientLevel, Set<ParticleEmitterInstance>>> iterator = externalEmitters.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Set<ParticleEmitterInstance> tracked = iterator.next().getValue();
+            if (tracked.remove(emitter) && tracked.isEmpty()) {
+                iterator.remove();
+                return;
+            }
+        }
+    }
+
+    private void untrackEmitter(ClientLevel level, ParticleEmitterInstance emitter) {
+        Set<ParticleEmitterInstance> tracked = externalEmitters.get(level);
+        if (tracked == null) return;
+        tracked.remove(emitter);
+        if (tracked.isEmpty()) externalEmitters.remove(level);
     }
 
     public List<ActiveWorldEmitter> getEmitters() {

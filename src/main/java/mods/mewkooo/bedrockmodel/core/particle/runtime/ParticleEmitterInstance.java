@@ -333,6 +333,8 @@ public class ParticleEmitterInstance {
     public int getParticleCount() { return particles.size() + externallyManagedParticles.size(); }
     /** Releases a particle previously handed to an external manager. Safe to call more than once. */
     public void releaseExternalParticle(ParticleInstance particle) { externallyManagedParticles.remove(particle); }
+    /** Releases ownership records after an external particle engine discards its entire world queue. */
+    public void releaseAllExternalParticles() { externallyManagedParticles.clear(); }
     public boolean isActive() { return active; }
     public boolean isFinished() { return removed && particles.isEmpty() && externallyManagedParticles.isEmpty(); }
 

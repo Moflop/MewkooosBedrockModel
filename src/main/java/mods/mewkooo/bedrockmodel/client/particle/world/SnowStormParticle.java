@@ -227,7 +227,7 @@ public class SnowStormParticle extends TextureSheetParticle {
     @Override
     public void remove() {
         super.remove();
-        emitter.releaseExternalParticle(particleData);
+        WorldEmitterManager.getInstance().onParticleRemoved(emitter, particleData);
     }
 
     private void reanchorForTick() {
