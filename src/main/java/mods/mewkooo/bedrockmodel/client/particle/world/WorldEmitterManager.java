@@ -4,6 +4,7 @@ import mods.mewkooo.bedrockmodel.BedrockModelMod;
 import mods.mewkooo.bedrockmodel.api.animation.time.AnimationClock;
 import mods.mewkooo.bedrockmodel.client.legacy.animation.PausedClientAnimationClock;
 import mods.mewkooo.bedrockmodel.core.particle.data.ParticleEffectDefinition;
+import mods.mewkooo.bedrockmodel.core.particle.resource.ParticleDefinitionLoader;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.EventExecutor;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleEventSink;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleEmitterInstance;
@@ -11,6 +12,9 @@ import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleInstance;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleMolangEnvironment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -322,8 +326,8 @@ public class WorldEmitterManager {
     private ParticleEventSink createEventSink(ClientLevel level) {
         return new ParticleEventSink() {
             @Override
-            public void spawnParticle(net.minecraft.resources.ResourceLocation effectId, Vec3 position) {
-                ParticleEffectDefinition child = mods.mewkooo.bedrockmodel.core.particle.resource.ParticleDefinitionLoader
+            public void spawnParticle(ResourceLocation effectId, Vec3 position) {
+                ParticleEffectDefinition child = ParticleDefinitionLoader
                         .getInstance().getDefinition(effectId);
                 if (child != null) {
                     addEmitter(level, position, Vec3.ZERO, child);
@@ -331,10 +335,10 @@ public class WorldEmitterManager {
             }
 
             @Override
-            public void playSound(net.minecraft.resources.ResourceLocation soundId, Vec3 position) {
+            public void playSound(ResourceLocation soundId, Vec3 position) {
                 level.playLocalSound(position.x, position.y, position.z,
-                        net.minecraft.sounds.SoundEvent.createVariableRangeEvent(soundId),
-                        net.minecraft.sounds.SoundSource.AMBIENT, 1.0f, 1.0f, false);
+                        SoundEvent.createVariableRangeEvent(soundId),
+                        SoundSource.AMBIENT, 1.0f, 1.0f, false);
             }
         };
     }

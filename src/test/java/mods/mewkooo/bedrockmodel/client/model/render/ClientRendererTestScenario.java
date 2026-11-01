@@ -1,5 +1,13 @@
 package mods.mewkooo.bedrockmodel.client.model.render;
 
+import com.github.argon4w.acceleratedrendering.core.CoreFeature;
+import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.AcceleratedBufferSource;
+import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.IAcceleratedBufferSource;
+import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.builders.BufferSourceExtension;
+import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.builders.IAcceleratableBufferSource;
+import com.github.argon4w.acceleratedrendering.core.buffers.accelerated.layers.LayerDrawType;
+import com.github.argon4w.acceleratedrendering.core.buffers.environments.IBufferEnvironment;
+import com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityRenderingFeature;
 import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -28,11 +36,13 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 
 import java.nio.ByteBuffer;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /** Small real GPU readback check, invoked only by the opt-in client integration harness. */
 @EventBusSubscriber(modid = BedrockModelMod.MOD_ID, value = Dist.CLIENT)
@@ -158,7 +168,7 @@ public final class ClientRendererTestScenario {
         target.bindWrite(true);
         PoseStack pose = new PoseStack();
         pose.translate(0, 0, -3);
-        pose.mulPose(new org.joml.Quaternionf().rotateXYZ(0.2f, 0.45f, 0));
+        pose.mulPose(new Quaternionf().rotateXYZ(0.2f, 0.45f, 0));
         VertexConsumer consumer = source.getBuffer(MATERIAL);
         if (frames == 0) BedrockModelMod.LOGGER.info("[SBM_CLIENT_TEST] renderer source={} consumer={} baked={} nativeWriter={}",
                 source.getClass().getName(), consumer.getClass().getName(), useBaked, nativeWriter);
@@ -216,32 +226,32 @@ public final class ClientRendererTestScenario {
 
     /** Loaded only when AR is installed; the ordinary live source is restored before the world pass continues. */
     private static final class ArScope implements AccelerationScope {
-        private final com.github.argon4w.acceleratedrendering.core.buffers.accelerated.builders.IAcceleratableBufferSource source;
-        private final java.util.function.Supplier<com.github.argon4w.acceleratedrendering.core.buffers.accelerated.IAcceleratedBufferSource> previous;
-        private final com.github.argon4w.acceleratedrendering.core.buffers.accelerated.AcceleratedBufferSource isolated;
+        private final IAcceleratableBufferSource source;
+        private final Supplier<IAcceleratedBufferSource> previous;
+        private final AcceleratedBufferSource isolated;
 
         private ArScope(MultiBufferSource.BufferSource source) {
-            check(com.github.argon4w.acceleratedrendering.core.CoreFeature.isRenderingLevel(),
+            check(CoreFeature.isRenderingLevel(),
                     "AR must be inside its real level render scope");
-            check(com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityRenderingFeature.isEnabled(),
+            check(AcceleratedEntityRenderingFeature.isEnabled(),
                     "AR entity rendering must be enabled for the accelerated profile");
             BedrockModelMod.LOGGER.info("[SBM_CLIENT_TEST] AR stage pipeline before explicit opt-in={}, entityEnabled={}, levelScope={}",
-                    com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityRenderingFeature.getPipelineSetting(),
-                    com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityRenderingFeature.isEnabled(),
-                    com.github.argon4w.acceleratedrendering.core.CoreFeature.isRenderingLevel());
-            this.source = com.github.argon4w.acceleratedrendering.core.buffers.accelerated.builders.BufferSourceExtension.getAcceleratable(source);
+                    AcceleratedEntityRenderingFeature.getPipelineSetting(),
+                    AcceleratedEntityRenderingFeature.isEnabled(),
+                    CoreFeature.isRenderingLevel());
+            this.source = BufferSourceExtension.getAcceleratable(source);
             previous = this.source.getBoundAcceleratedBufferSource();
-            isolated = new com.github.argon4w.acceleratedrendering.core.buffers.accelerated.AcceleratedBufferSource(
-                    com.github.argon4w.acceleratedrendering.core.buffers.environments.IBufferEnvironment.Presets.ENTITY);
+            isolated = new AcceleratedBufferSource(
+                    IBufferEnvironment.Presets.ENTITY);
             this.source.bindAcceleratedBufferSource(() -> isolated);
             // AR's stage filter deliberately pushes VANILLA for third-party RenderLevelStageEvent callbacks.
             // Opt this owned test geometry in through AR's public scoped API, then restore the stage setting.
-            com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityRenderingFeature.forceUseAcceleratedPipeline();
+            AcceleratedEntityRenderingFeature.forceUseAcceleratedPipeline();
         }
 
         @Override public void flush() {
             isolated.prepareBuffers();
-            isolated.drawBuffers(com.github.argon4w.acceleratedrendering.core.buffers.accelerated.layers.LayerDrawType.ALL);
+            isolated.drawBuffers(LayerDrawType.ALL);
             isolated.clearBuffers();
         }
 
@@ -250,7 +260,7 @@ public final class ClientRendererTestScenario {
                 source.bindAcceleratedBufferSource(previous);
                 isolated.delete();
             } finally {
-                com.github.argon4w.acceleratedrendering.features.entities.AcceleratedEntityRenderingFeature.resetPipeline();
+                AcceleratedEntityRenderingFeature.resetPipeline();
             }
         }
     }

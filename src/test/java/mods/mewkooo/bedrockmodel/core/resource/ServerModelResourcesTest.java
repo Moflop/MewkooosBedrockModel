@@ -1,7 +1,9 @@
 package mods.mewkooo.bedrockmodel.core.resource;
 
+import mods.mewkooo.bedrockmodel.api.model.BakerOptions;
 import mods.mewkooo.bedrockmodel.api.model.ModelType;
 import mods.mewkooo.bedrockmodel.api.resource.BedrockModelBakeContext;
+import mods.mewkooo.bedrockmodel.api.resource.BedrockModelResource;
 import mods.mewkooo.bedrockmodel.api.resource.BedrockResources;
 import mods.mewkooo.bedrockmodel.core.animation.BedrockAnimation;
 import mods.mewkooo.bedrockmodel.core.json.pojo.BedrockModelPOJO;
@@ -21,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.concurrent.CountDownLatch;
@@ -139,7 +142,7 @@ class ServerModelResourcesTest {
         CountDownLatch secondBakeStarted = new CountDownLatch(1);
         CountDownLatch finishSecondBake = new CountDownLatch(1);
         var loader = RawResourceLoaders.forLogicalSide(LogicalSide.SERVER);
-        var options = (java.util.function.Function<BedrockModelBakeContext, mods.mewkooo.bedrockmodel.api.model.BakerOptions>) context -> {
+        var options = (Function<BedrockModelBakeContext, BakerOptions>) context -> {
             if (pauseSecondBake.get() && bakeCount.incrementAndGet() == 2) {
                 secondBakeStarted.countDown();
                 try {
@@ -151,7 +154,7 @@ class ServerModelResourcesTest {
                     throw new IllegalStateException(e);
                 }
             }
-            return mods.mewkooo.bedrockmodel.api.model.BakerOptions.defaults();
+            return BakerOptions.defaults();
         };
         var entries = Map.of(
                 ID, new BedrockModelEntry(loader, ID, ModelType.BAKED, options, List.of(), false),
@@ -162,7 +165,7 @@ class ServerModelResourcesTest {
         var pojo = Optional.of(parse(LogicalSide.SERVER));
         Map<ResourceLocation, Optional<BedrockModelPOJO>> prepared = Map.of(ID, pojo, secondId, pojo);
         repository.apply(prepared, manager, InactiveProfiler.INSTANCE);
-        Map<ResourceLocation, mods.mewkooo.bedrockmodel.api.resource.BedrockModelResource> previous = repository.getAllResources();
+        Map<ResourceLocation, BedrockModelResource> previous = repository.getAllResources();
         assertEquals(2, previous.size());
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -170,7 +173,7 @@ class ServerModelResourcesTest {
             pauseSecondBake.set(true);
             var reload = executor.submit(() -> repository.apply(prepared, manager, InactiveProfiler.INSTANCE));
             assertTrue(secondBakeStarted.await(5, TimeUnit.SECONDS));
-            Map<ResourceLocation, mods.mewkooo.bedrockmodel.api.resource.BedrockModelResource> snapshot = repository.getAllResources();
+            Map<ResourceLocation, BedrockModelResource> snapshot = repository.getAllResources();
             assertEquals(2, snapshot.size());
             assertSame(previous.get(ID), snapshot.get(ID));
             assertSame(previous.get(secondId), snapshot.get(secondId));

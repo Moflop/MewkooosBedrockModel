@@ -25,6 +25,7 @@ import net.neoforged.neoforge.client.event.RenderFrameEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.fml.common.EventBusSubscriber;
+import org.jetbrains.annotations.ApiStatus;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GLCapabilities;
 import org.lwjgl.opengl.GL11;
@@ -449,7 +450,7 @@ public class StaticMeshCache {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
-    @org.jetbrains.annotations.ApiStatus.Internal
+    @ApiStatus.Internal
     public static void onRenderTick(RenderFrameEvent.Pre event) {
         beginFrame();
     }
@@ -470,7 +471,7 @@ public class StaticMeshCache {
     }
 
     @SubscribeEvent
-    @org.jetbrains.annotations.ApiStatus.Internal
+    @ApiStatus.Internal
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (!event.getLevel().isClientSide()) return;
         Runnable action = () -> {

@@ -27,10 +27,12 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Map<ResourceLocation, Optional<BedrockModelPOJO>>>
         implements BedrockModelAccess {
@@ -63,11 +65,11 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
                            Map<ResourceLocation, BedrockModelEntry> entries,
                            List<Consumer<Map<ResourceLocation, BedrockModelResource>>> listeners,
                            BedrockAnimationSourceRepository animationSources,
-                           java.util.function.Function<BedrockModelPOJO, ? extends BedrockModel> legacyModelFactory) {
+                           Function<BedrockModelPOJO, ? extends BedrockModel> legacyModelFactory) {
         this.entries = Map.copyOf(entries);
         this.listeners = List.copyOf(listeners);
         this.modelFactory = new BedrockModelFactory(animationSources, legacyModelFactory);
-        this.logicalSide = java.util.Objects.requireNonNull(logicalSide, "logicalSide");
+        this.logicalSide = Objects.requireNonNull(logicalSide, "logicalSide");
         this.generation = new Generation(Map.of(), Map.of(), null, modelFactory.snapshot());
     }
 

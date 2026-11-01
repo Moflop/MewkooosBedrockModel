@@ -1,5 +1,6 @@
 package mods.mewkooo.bedrockmodel.core.animation;
 
+import mods.mewkooo.bedrockmodel.api.animation.AnimationClip;
 import mods.mewkooo.bedrockmodel.api.model.BedrockModel;
 import mods.mewkooo.bedrockmodel.core.animation.ParticleEffectDataKeyframe;
 import mods.mewkooo.bedrockmodel.core.animation.ResourceLocationKeyframe;
@@ -23,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public class BedrockAnimation extends BasicAnimation implements mods.mewkooo.bedrockmodel.api.animation.AnimationClip {
+public class BedrockAnimation extends BasicAnimation implements AnimationClip {
     private static final float DEGREE_TO_ANGLE = (float) (Math.PI / 180);
     public static final String SOUND_CHANNEL_NAME = "sound_effects";
     public static final String PARTICLE_CHANNEL_NAME = "particle_effects";

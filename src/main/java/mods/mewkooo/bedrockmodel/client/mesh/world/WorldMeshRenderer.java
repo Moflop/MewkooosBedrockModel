@@ -24,6 +24,7 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import org.jetbrains.annotations.ApiStatus;
 import org.joml.Matrix4f;
 
 import java.util.ArrayList;
@@ -209,13 +210,13 @@ public class WorldMeshRenderer {
     public static long stateUpdateTick() { return stateUpdateTick; }
 
     @SubscribeEvent
-    @org.jetbrains.annotations.ApiStatus.Internal
+    @ApiStatus.Internal
     public static void onClientTick(ClientTickEvent.Post event) {
         if (!MESH_GROUPS.isEmpty()) stateUpdateTick++;
     }
 
     @SubscribeEvent
-    @org.jetbrains.annotations.ApiStatus.Internal
+    @ApiStatus.Internal
     public static void onLevelUnload(LevelEvent.Unload event) {
         if (!event.getLevel().isClientSide()) return;
         Runnable unload = () -> {
@@ -247,7 +248,7 @@ public class WorldMeshRenderer {
     }
 
     @SubscribeEvent
-    @org.jetbrains.annotations.ApiStatus.Internal
+    @ApiStatus.Internal
     public static void onRenderStage(RenderLevelStageEvent event) {
         if (MESH_GROUPS.isEmpty() || event.getStage() != RenderLevelStageEvent.Stage.AFTER_BLOCK_ENTITIES) {
             return;

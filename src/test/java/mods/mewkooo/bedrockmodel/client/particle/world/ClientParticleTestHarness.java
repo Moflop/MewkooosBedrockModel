@@ -7,20 +7,24 @@ import mods.mewkooo.bedrockmodel.client.model.render.ClientRendererTestScenario;
 import mods.mewkooo.bedrockmodel.client.resource.ClientReloadStressScenario;
 import mods.mewkooo.bedrockmodel.core.particle.data.ParticleDescription;
 import mods.mewkooo.bedrockmodel.core.particle.data.ParticleEffectDefinition;
+import mods.mewkooo.bedrockmodel.core.particle.data.component.IComponent;
 import mods.mewkooo.bedrockmodel.core.particle.data.component.ParticleLifetimeEvents;
 import mods.mewkooo.bedrockmodel.core.particle.data.component.ParticleLifetimeExpression;
 import mods.mewkooo.bedrockmodel.core.particle.data.component.motion.ParticleMotionCollision;
+import mods.mewkooo.bedrockmodel.core.particle.data.event.IEventNode;
 import mods.mewkooo.bedrockmodel.core.particle.data.event.SoundEffectEvent;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.EventExecutor;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleEmitterInstance;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleEventSink;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleInstance;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleMolangEnvironment;
+import mods.sbmtest.ChunkUnloadDiagnostics;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.Level;
@@ -38,11 +42,13 @@ import org.joml.Matrix4f;
 
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 @EventBusSubscriber(modid = BedrockModelMod.MOD_ID, value = Dist.CLIENT)
 public final class ClientParticleTestHarness {
@@ -61,14 +67,14 @@ public final class ClientParticleTestHarness {
     private static ParticleEmitterInstance collisionEmitter;
     private static AtomicInteger collisions;
     private static AtomicInteger expirations;
-    private static final Map<BlockPos, BlockState> RESTORE_BLOCKS = new java.util.LinkedHashMap<>();
+    private static final Map<BlockPos, BlockState> RESTORE_BLOCKS = new LinkedHashMap<>();
     private static ParticleEmitterInstance lifecycleEmitter;
     private static ParticleEmitterInstance unloadEmitter;
     private static final long STARTED_AT = System.nanoTime();
     private static boolean inTransitionCall;
     private static ClientLevel departedLevel;
     private static ParticleEmitterInstance detachedEmitter;
-    private static net.minecraft.resources.ResourceKey<Level> targetDimension;
+    private static ResourceKey<Level> targetDimension;
     private static CompletableFuture<?> transitionTask;
     private static int realUnloadEvents;
     private static int realDimensionChanges;
@@ -84,7 +90,7 @@ public final class ClientParticleTestHarness {
         Minecraft minecraft = Minecraft.getInstance();
         try {
             if (inTransitionCall) return;
-            if (System.nanoTime() - STARTED_AT > java.util.concurrent.TimeUnit.MINUTES.toNanos(10)) {
+            if (System.nanoTime() - STARTED_AT > TimeUnit.MINUTES.toNanos(10)) {
                 throw new AssertionError("client integration scenario exceeded ten minutes");
             }
             if (stage == Stage.WAITING_FOR_EXIT) {
@@ -265,7 +271,7 @@ public final class ClientParticleTestHarness {
         var manager = WorldEmitterManager.getInstance();
         Vec3 position = minecraft.player.position().add(0, 2, 0);
         var definition = definition(false);
-        List<mods.mewkooo.bedrockmodel.core.particle.data.component.IComponent> components = List.of(
+        List<IComponent> components = List.of(
                 new ParticleLifetimeExpression(new ParticleMolangEnvironment().compile("1200"), null));
         var longLived = new ParticleEffectDefinition(definition.getIdentifier(), definition.getDescription(), components,
                 definition.getCurves(), definition.getEvents());
@@ -285,14 +291,14 @@ public final class ClientParticleTestHarness {
     private static void requestDimensionOrExit(Minecraft minecraft) {
         if (realDimensionChanges > 0) {
             BedrockModelMod.LOGGER.info("[SBM_CLIENT_TEST] transition departure arrivalAgeMs={} serverTicks={}",
-                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lastArrivalNanos),
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lastArrivalNanos),
                     minecraft.getSingleplayerServer().getTickCount() - settlingStartTick);
         }
         if (realDimensionChanges == 2 * TRANSITION_CYCLES) {
             stage = Stage.WAITING_FOR_EXIT;
             inTransitionCall = true;
             try {
-                mods.sbmtest.ChunkUnloadDiagnostics.arm(minecraft.getSingleplayerServer());
+                ChunkUnloadDiagnostics.arm(minecraft.getSingleplayerServer());
                 minecraft.level.disconnect();
                 minecraft.disconnect(new TitleScreen());
             } finally {
@@ -313,7 +319,7 @@ public final class ClientParticleTestHarness {
             check(destination != null, "destination dimension must exist");
             double coordinate = TRANSITION_ORIGIN + 0.5;
             player.teleportTo(destination, coordinate, 90, coordinate, 0, 0);
-            mods.sbmtest.ChunkUnloadDiagnostics.arm(server);
+            ChunkUnloadDiagnostics.arm(server);
         });
     }
 
@@ -492,8 +498,8 @@ public final class ClientParticleTestHarness {
         ResourceLocation id = ResourceLocation.fromNamespaceAndPath("test", "client_particle_test");
         ParticleDescription description = new ParticleDescription(id, ParticleDescription.Material.PARTICLES_BLEND,
                 ResourceLocation.fromNamespaceAndPath("minecraft", "textures/block/stone.png"), 0, 0);
-        List<mods.mewkooo.bedrockmodel.core.particle.data.component.IComponent> components = new ArrayList<>();
-        Map<String, List<mods.mewkooo.bedrockmodel.core.particle.data.event.IEventNode>> events = Map.of();
+        List<IComponent> components = new ArrayList<>();
+        Map<String, List<IEventNode>> events = Map.of();
         if (collision) {
             components.add(new ParticleMotionCollision(null, 0, 0, 0, true,
                     List.of(new ParticleMotionCollision.CollisionEvent("contact", 0))));

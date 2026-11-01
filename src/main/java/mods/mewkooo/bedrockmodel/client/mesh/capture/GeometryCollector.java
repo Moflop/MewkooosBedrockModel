@@ -1,6 +1,7 @@
 package mods.mewkooo.bedrockmodel.client.mesh.capture;
 
 import mods.mewkooo.bedrockmodel.client.mesh.render.EmissiveMeshRenderTypes;
+import mods.mewkooo.bedrockmodel.client.model.render.TreeModelRenderer;
 
 import mods.mewkooo.bedrockmodel.client.legacy.renderer.BedrockModelRenderTypes;
 import mods.mewkooo.bedrockmodel.api.resource.BedrockModelResource;
@@ -74,10 +75,10 @@ public class GeometryCollector {
         pose.mulPose(Axis.YP.rotationDegrees(-facing.toYRot()));
         var instance = model.createInstance();
         instance.resetPose();
-        mods.mewkooo.bedrockmodel.client.model.render.TreeModelRenderer.renderBoneTree(instance, pose, buffer(RenderType.entityCutout(texture),
+        TreeModelRenderer.renderBoneTree(instance, pose, buffer(RenderType.entityCutout(texture),
                         EmissiveMeshRenderTypes.cutout(texture, VertexFormat.Mode.QUADS), VertexFormat.Mode.QUADS),
                 0, OverlayTexture.NO_OVERLAY, 1, 1, 1, 1, true);
-        mods.mewkooo.bedrockmodel.client.model.render.TreeModelRenderer.renderBoneTree(instance, pose, buffer(BedrockModelRenderTypes.polyMeshCutout(texture),
+        TreeModelRenderer.renderBoneTree(instance, pose, buffer(BedrockModelRenderTypes.polyMeshCutout(texture),
                         EmissiveMeshRenderTypes.cutout(texture, VertexFormat.Mode.TRIANGLES), VertexFormat.Mode.TRIANGLES),
                 0, OverlayTexture.NO_OVERLAY, 1, 1, 1, 1, false);
         return true;

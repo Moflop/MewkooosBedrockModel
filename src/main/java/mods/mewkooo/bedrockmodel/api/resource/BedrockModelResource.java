@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /** A loaded model and its animation clips. The concrete model is selected by {@link #kind()}. */
 public record BedrockModelResource(
@@ -17,7 +18,7 @@ public record BedrockModelResource(
         Map<ResourceLocation, List<AnimationClip>> animations
 ) {
     public BedrockModelResource {
-        java.util.Objects.requireNonNull(model, "model");
+        Objects.requireNonNull(model, "model");
         Map<ResourceLocation, List<AnimationClip>> immutableAnimations = new LinkedHashMap<>();
         animations.forEach((id, clips) -> immutableAnimations.put(id, List.copyOf(clips)));
         animations = Map.copyOf(immutableAnimations);

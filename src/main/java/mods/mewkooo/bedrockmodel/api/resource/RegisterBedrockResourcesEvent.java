@@ -8,6 +8,7 @@ import net.neoforged.bus.api.Event;
 import net.neoforged.fml.LogicalSide;
 import net.neoforged.fml.event.IModBusEvent;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -35,7 +36,7 @@ public final class RegisterBedrockResourcesEvent extends Event implements IModBu
     public RegisterBedrockResourcesEvent(Dist dist, LogicalSide logicalSide) {
         this(dist, logicalSide, new RawResourceLoader() {
             @Override
-            public <T> T load(java.io.InputStream input, Class<T> type) {
+            public <T> T load(InputStream input, Class<T> type) {
                 throw new IllegalStateException("A runtime resource loader was not supplied");
             }
         });

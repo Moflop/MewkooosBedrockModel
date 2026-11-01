@@ -19,6 +19,7 @@ import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +71,7 @@ public class BedrockGeometryBaker {
                                  Matrix4f toAttach, Matrix3f normalToAttach, BakedGeometryChunkBuilder out,
                                  RetainedCubeGeometryBuilder retainedCubeGeometry) {
         float[] size = cube.getSize();
-        float[] origin = java.util.Arrays.copyOf(cube.getOrigin(), 3);
+        float[] origin = Arrays.copyOf(cube.getOrigin(), 3);
         float inflate = cube.getInflate();
         float x0 = -(origin[0] + size[0] + inflate) / 16.0f;
         float x1 = -(origin[0] - inflate) / 16.0f;
@@ -79,8 +80,8 @@ public class BedrockGeometryBaker {
         float z0 = (origin[2] - inflate) / 16.0f;
         float z1 = (origin[2] + size[2] + inflate) / 16.0f;
         Matrix4f cubeTransform = new Matrix4f();
-        float[] cubeRotation = cube.getRotation() != null ? java.util.Arrays.copyOf(cube.getRotation(), 3) : null;
-        float[] cubePivot = cube.getPivot() != null ? java.util.Arrays.copyOf(cube.getPivot(), 3) : null;
+        float[] cubeRotation = cube.getRotation() != null ? Arrays.copyOf(cube.getRotation(), 3) : null;
+        float[] cubePivot = cube.getPivot() != null ? Arrays.copyOf(cube.getPivot(), 3) : null;
         if (cubePivot != null) {
             cubePivot[0] = -cubePivot[0];
             cubeTransform.translate(cubePivot[0] / 16.0f, cubePivot[1] / 16.0f, cubePivot[2] / 16.0f);

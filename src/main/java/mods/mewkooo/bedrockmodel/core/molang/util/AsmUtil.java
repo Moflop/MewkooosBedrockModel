@@ -25,6 +25,7 @@ package mods.mewkooo.bedrockmodel.core.molang.util;
 
 import mods.mewkooo.bedrockmodel.core.molang.runtime.TypeCastException;
 import org.jetbrains.annotations.NotNull;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -122,8 +123,8 @@ public final class AsmUtil {
                 break;
             case Type.BOOLEAN:
                 // int to boolean: 0 → 0, nonzero → 1
-                org.objectweb.asm.Label falseLabel = new org.objectweb.asm.Label();
-                org.objectweb.asm.Label endLabel = new org.objectweb.asm.Label();
+                Label falseLabel = new Label();
+                Label endLabel = new Label();
                 mv.visitJumpInsn(Opcodes.IFEQ, falseLabel);
                 mv.visitInsn(Opcodes.ICONST_1);
                 mv.visitJumpInsn(Opcodes.GOTO, endLabel);

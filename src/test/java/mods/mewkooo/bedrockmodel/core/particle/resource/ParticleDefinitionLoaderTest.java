@@ -1,5 +1,6 @@
 package mods.mewkooo.bedrockmodel.core.particle.resource;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleMolangEnvironment;
 import net.minecraft.resources.ResourceLocation;
@@ -20,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ParticleDefinitionLoaderTest {
     private static final String DEFINITION = """
@@ -57,15 +59,15 @@ class ParticleDefinitionLoaderTest {
 
         CountDownLatch firstDefinitionParsed = new CountDownLatch(1);
         CountDownLatch continueParsing = new CountDownLatch(1);
-        Map<ResourceLocation, com.google.gson.JsonElement> prepared = new AbstractMap<>() {
-            private final List<Entry<ResourceLocation, com.google.gson.JsonElement>> entries = List.of(
+        Map<ResourceLocation, JsonElement> prepared = new AbstractMap<>() {
+            private final List<Entry<ResourceLocation, JsonElement>> entries = List.of(
                     Map.entry(firstId, JsonParser.parseString(DEFINITION.replace("test:particle", "test:first"))),
                     Map.entry(secondId, JsonParser.parseString(DEFINITION.replace("test:particle", "test:second"))));
 
-            @Override public Set<Entry<ResourceLocation, com.google.gson.JsonElement>> entrySet() { return Set.copyOf(entries); }
+            @Override public Set<Entry<ResourceLocation, JsonElement>> entrySet() { return Set.copyOf(entries); }
 
             @Override
-            public void forEach(BiConsumer<? super ResourceLocation, ? super com.google.gson.JsonElement> action) {
+            public void forEach(BiConsumer<? super ResourceLocation, ? super JsonElement> action) {
                 action.accept(entries.getFirst().getKey(), entries.getFirst().getValue());
                 firstDefinitionParsed.countDown();
                 try {
@@ -83,7 +85,7 @@ class ParticleDefinitionLoaderTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             var reload = executor.submit(() -> loader.apply(prepared, null, InactiveProfiler.INSTANCE));
-            org.junit.jupiter.api.Assertions.assertTrue(firstDefinitionParsed.await(5, TimeUnit.SECONDS));
+            assertTrue(firstDefinitionParsed.await(5, TimeUnit.SECONDS));
             assertEquals(previous, loader.getAllDefinitions());
             assertNotNull(loader.getDefinition(previousId));
             continueParsing.countDown();

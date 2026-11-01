@@ -73,6 +73,8 @@ public final class BedrockResources {
 
 ## 查询、动画和渲染时机
 
+按动画名称播放单个片段，以及结合 MAE 创建 `idle` / `walk` 状态机的完整最小示例，见[动画播放最小实现](animation-playback.md)。
+
 资源重载完成后再查询仓库。首次重载前或文件缺失时 getter 返回 `null`，调用方应保留回退路径。每个实体保留自己的实例，模型定义可共享：
 
 ```java

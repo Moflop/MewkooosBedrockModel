@@ -21,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 
 /** 临时共享静态网格的即时绘制入口，以及显式渲染阶段批次入口。 */
 @OnlyIn(Dist.CLIENT)
@@ -34,7 +35,7 @@ public class StaticMeshRenderer {
 
     /** 阶段所有者负责协调原版缓冲，并在改变阶段状态前关闭批次。 */
     public static StaticMeshBufferSource openBatch(ResourceLocation owner, BatchOrder order,
-                                                   java.util.function.BooleanSupplier isCurrent) {
+                                                   BooleanSupplier isCurrent) {
         RenderSystem.assertOnRenderThread();
         if (MeshRenderDebug.attributes != null) throw new IllegalStateException("Batch uses production attributes");
         return new StaticMeshBufferSource(Objects.requireNonNull(owner), Objects.requireNonNull(order),
@@ -94,8 +95,8 @@ public class StaticMeshRenderer {
         return result;
     }
 
-    public static int attributeIndex(VertexFormat format, com.mojang.blaze3d.vertex.VertexFormatElement element) {
-        List<com.mojang.blaze3d.vertex.VertexFormatElement> elements = format.getElements();
+    public static int attributeIndex(VertexFormat format, VertexFormatElement element) {
+        List<VertexFormatElement> elements = format.getElements();
         for (int i = 0; i < elements.size(); i++) if (elements.get(i) == element) return i;
         return -1;
     }

@@ -16,16 +16,19 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 
 final class BedrockModelFactory {
     private final BedrockAnimationSourceRepository animationSources;
-    private final java.util.function.Function<BedrockModelPOJO, ? extends BedrockModel> legacyModelFactory;
+    private final Function<BedrockModelPOJO, ? extends BedrockModel> legacyModelFactory;
 
     BedrockModelFactory(BedrockAnimationSourceRepository animationSources,
-                        java.util.function.Function<BedrockModelPOJO, ? extends BedrockModel> legacyModelFactory) {
+                        Function<BedrockModelPOJO, ? extends BedrockModel> legacyModelFactory) {
         this.animationSources = animationSources;
         this.legacyModelFactory = legacyModelFactory;
     }
@@ -66,15 +69,15 @@ final class BedrockModelFactory {
         return BakedBedrockModel.bake(pojo, options == null ? BakerOptions.defaults() : options);
     }
 
-    private static java.util.Set<String> collectAnimatedBones(List<BedrockAnimationFile> files) {
-        java.util.LinkedHashSet<String> bones = new java.util.LinkedHashSet<>();
+    private static Set<String> collectAnimatedBones(List<BedrockAnimationFile> files) {
+        LinkedHashSet<String> bones = new LinkedHashSet<>();
         for (BedrockAnimationFile file : files) {
             if (file == null || file.getAnimations() == null) continue;
             file.getAnimations().values().forEach(animation -> {
                 if (animation != null && animation.getBones() != null) bones.addAll(animation.getBones().keySet());
             });
         }
-        return java.util.Set.copyOf(bones);
+        return Set.copyOf(bones);
     }
 
     private List<BedrockAnimationFile> collectAnimationFiles(BedrockModelEntry entry) {

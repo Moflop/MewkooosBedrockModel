@@ -2,6 +2,7 @@ package mods.mewkooo.bedrockmodel.api.model;
 
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /** Options controlling static geometry baking. */
 public record BakerOptions(
@@ -42,7 +43,7 @@ public record BakerOptions(
     }
 
     public BakerOptions withPreservedBoneRegexes(Set<String> regexes) {
-        return withPreservedBonePatterns(regexes.stream().map(Pattern::compile).collect(java.util.stream.Collectors.toSet()));
+        return withPreservedBonePatterns(regexes.stream().map(Pattern::compile).collect(Collectors.toSet()));
     }
 
     public BakerOptions withDebugFoldedTree(boolean value) {

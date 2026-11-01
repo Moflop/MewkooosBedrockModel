@@ -30,7 +30,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -485,7 +487,7 @@ class BedrockModelBakerTest {
 
     }
 
-    private static void assertPoseStackRestored(java.util.function.Consumer<PoseStack> renderer) {
+    private static void assertPoseStackRestored(Consumer<PoseStack> renderer) {
         PoseStack poseStack = newNonIdentityPoseStack();
         Matrix4f expectedPose = new Matrix4f(poseStack.last().pose());
         Matrix3f expectedNormal = new Matrix3f(poseStack.last().normal());
@@ -562,7 +564,7 @@ class BedrockModelBakerTest {
         try (InputStream stream = openResource(resourceName);
              InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
             BedrockAnimationFile animationFile = GsonUtil.CLIENT_GSON.fromJson(reader, BedrockAnimationFile.class);
-            java.util.LinkedHashSet<String> bones = new java.util.LinkedHashSet<>();
+            LinkedHashSet<String> bones = new LinkedHashSet<>();
             if (animationFile.getAnimations() != null) animationFile.getAnimations().values().forEach(animation -> {
                 if (animation != null && animation.getBones() != null) bones.addAll(animation.getBones().keySet());
             });

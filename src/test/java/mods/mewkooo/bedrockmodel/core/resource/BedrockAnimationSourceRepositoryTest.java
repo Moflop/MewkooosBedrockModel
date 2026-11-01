@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -18,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BedrockAnimationSourceRepositoryTest {
     @Test
@@ -45,7 +47,7 @@ class BedrockAnimationSourceRepositoryTest {
         CountDownLatch firstEntryCopied = new CountDownLatch(1);
         CountDownLatch continueCopy = new CountDownLatch(1);
         Map<ResourceLocation, Optional<BedrockAnimationFile>> prepared = new AbstractMap<>() {
-            private final java.util.List<Entry<ResourceLocation, Optional<BedrockAnimationFile>>> entries = java.util.List.of(
+            private final List<Entry<ResourceLocation, Optional<BedrockAnimationFile>>> entries = List.of(
                     Map.entry(firstId, Optional.empty()), Map.entry(secondId, Optional.empty()));
 
             @Override
@@ -88,7 +90,7 @@ class BedrockAnimationSourceRepositoryTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             var reload = executor.submit(() -> repository.apply(prepared, null, InactiveProfiler.INSTANCE));
-            org.junit.jupiter.api.Assertions.assertTrue(firstEntryCopied.await(5, TimeUnit.SECONDS));
+            assertTrue(firstEntryCopied.await(5, TimeUnit.SECONDS));
             assertEquals(Map.of(previousId, Optional.empty()), repository.getAllAnimationFiles());
             continueCopy.countDown();
             reload.get(5, TimeUnit.SECONDS);
