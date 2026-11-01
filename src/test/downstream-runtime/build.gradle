@@ -1,0 +1,94 @@
+import groovy.json.JsonOutput
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.TaskAction
+
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    mavenLocal {
+        content { includeGroup 'mods.mewkooo.bedrockmodel' }
+    }
+    mavenCentral()
+}
+
+neoForge {
+    version = '21.1.264'
+}
+
+def selectedLibraryVersion = providers.gradleProperty('libraryVersion')
+dependencies {
+    // This must use the published POM as a real consumer does. Do not add MAE,
+    // fastutil constraints, or dependency exclusions here: those would mask a
+    // missing exclusion in the library's publication.
+    implementation "mods.mewkooo.bedrockmodel:mewkooos_bedrock_model:${selectedLibraryVersion.get()}"
+}
+
+// The same public Pose API must remain usable after correcting transitive
+// runtime dependencies. Minecraft classes come from the actual ModDev plugin.
+sourceSets.main.java.setSrcDirs(['../downstream'])
+
+abstract class VerifyRuntimeClasspath extends DefaultTask {
+    @Classpath
+    abstract ConfigurableFileCollection getRuntimeFiles()
+
+    @Input
+    abstract Property<String> getLibraryVersion()
+
+    @OutputFile
+    abstract RegularFileProperty getReportFile()
+
+    @TaskAction
+    void verify() {
+        // Resolving files is deliberate. A Gradle dependencies report can exit
+        // successfully while displaying unresolved entries as FAILED.
+        def files = runtimeFiles.files.toList().sort { it.absolutePath }
+        def fastutil = files.findAll { it.name.startsWith('fastutil-') }
+        if (fastutil*.name != ['fastutil-8.5.12.jar']) {
+            throw new GradleException("Expected Minecraft's fastutil 8.5.12, got ${fastutil*.name}")
+        }
+        def mae = files.findAll { it.name.startsWith('mae-') }
+        if (mae*.name != ['mae-1.1.4.jar']) {
+            throw new GradleException("Expected the public MAE dependency 1.1.4, got ${mae*.name}")
+        }
+        def expectedLibrary = "mewkooos_bedrock_model-${libraryVersion.get()}.jar"
+        if (!files.any { it.name == expectedLibrary }) {
+            throw new GradleException("Published library is absent: ${expectedLibrary}")
+        }
+        def rendererPrefixes = ['sodium-', 'embeddium-', 'accelerated-rendering-',
+                                'acceleratedrendering-', 'iris-', 'configured-', 'playeranimator-']
+        def leakedRenderers = files.findAll { file ->
+            rendererPrefixes.any { prefix -> file.name.toLowerCase(Locale.ROOT).startsWith(prefix) }
+        }
+        if (!leakedRenderers.isEmpty()) {
+            throw new GradleException("Development renderer dependencies leaked downstream: ${leakedRenderers*.name}")
+        }
+        def output = reportFile.get().asFile
+        output.parentFile.mkdirs()
+        output.text = JsonOutput.prettyPrint(JsonOutput.toJson([
+                neoForgeVersion: '21.1.264',
+                library: "mods.mewkooo.bedrockmodel:mewkooos_bedrock_model:${libraryVersion.get()}",
+                fastutil: 'it.unimi.dsi:fastutil:8.5.12',
+                mae: 'com.maydaymemory:mae:1.1.4',
+                rendererDependencies: leakedRenderers*.name,
+                resolvedFileCount: files.size(),
+                resolvedFiles: files.collect { it.absolutePath }
+        ]))
+        logger.lifecycle("Resolved real NeoForge 21.1.264 runtime: fastutil 8.5.12, MAE 1.1.4; ${files.size()} files")
+    }
+}
+
+tasks.register('verifyRuntime', VerifyRuntimeClasspath) {
+    runtimeFiles.from(configurations.runtimeClasspath)
+    libraryVersion.set(selectedLibraryVersion)
+    reportFile.set(layout.buildDirectory.file('reports/runtime-dependencies.json'))
+}

@@ -2,7 +2,7 @@
 
 模型加载时会读取基岩版几何文件的 `item_display_transforms`，并在 `client.legacy.model.BedrockModel`、`core.model.tree.TreeBedrockModel` 和 `core.model.baked.BakedBedrockModel` 上通过 `getItemDisplayTransforms()` 暴露。该 API 保存显示参数，调用方负责选择视角、处理默认值并应用渲染变换。
 
-`ItemDisplayTransform(s)` 是 `api.model.display` 下的公共模型元数据类型。解析器先把 JSON 读入独立的 `core.json.pojo.ItemDisplayTransformsData`，再由 `core.json.mapping.ItemDisplayTransformsMapper` 转换成 API 值对象；两侧不共享数据类，JSON 字段名只由 `core.json` 处理。
+`ItemDisplayTransform(s)` 是 `api.model.display` 下的公共模型元数据类型。
 
 共享数据与客户端操作分别归属：`api.model.display` 可供两侧读取，不引用渲染类型；`api.client.display.BedrockDisplayTransforms` 是客户端专属的公共工具，负责将数据应用到渲染姿态。通用模型接口不依赖客户端 API。
 

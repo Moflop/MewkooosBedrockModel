@@ -146,15 +146,23 @@ repositories {
     mavenCentral()
 }
 
+// Keep the embedded dependency graph and published POM in sync. Minecraft
+// supplies these libraries, including its strictly pinned fastutil version.
+def minecraftProvidedMaeModules = [
+        [group: 'com.google.code.gson', module: 'gson'],
+        [group: 'com.google.code.findbugs', module: 'jsr305'],
+        [group: 'it.unimi.dsi', module: 'fastutil'],
+        [group: 'org.joml', module: 'joml']
+]
+
 dependencies {
     add(clientTestProfile == null ? 'implementation' : 'compileOnly',
             "maven.modrinth:sodium:mc1.21.1-0.6.13-neoforge")
     compileOnly "maven.modrinth:embeddium:1.0.11+mc1.21.1-neoforge"
     mcLib jarJar("com.maydaymemory:mae:1.1.4") {
-        exclude group: 'com.google.code.gson', module: 'gson'
-        exclude group: 'com.google.code.findbugs', module: 'jsr305'
-        exclude group: 'it.unimi.dsi', module: 'fastutil'
-        exclude group: 'org.joml', module: 'joml'
+        minecraftProvidedMaeModules.each { provided ->
+            exclude group: provided.group, module: provided.module
+        }
     }
 
     add(clientTestProfile == null ? 'implementation' : 'compileOnly',
@@ -312,6 +320,20 @@ tasks.register('compileDownstreamApi', JavaCompile) {
     options.encoding = 'UTF-8'
 }
 
+tasks.register('verifyDownstreamRuntime', Exec) {
+    group = 'verification'
+    description = 'Compiles and resolves a real NeoForge consumer of the published library.'
+    dependsOn publishToMavenLocal
+    workingDir projectDir
+    if (System.getProperty('os.name').toLowerCase(java.util.Locale.ROOT).contains('windows')) {
+        commandLine 'cmd.exe', '/d', '/c', 'gradlew.bat'
+    } else {
+        commandLine file('gradlew').absolutePath
+    }
+    args '--no-daemon', '--project-dir', file('src/test/downstream-runtime').absolutePath,
+            "-PlibraryVersion=${mod_version}", 'compileJava', 'verifyRuntime'
+}
+
 jmh {
     zip64 = true
     jmhVersion = '1.37'
@@ -367,6 +389,12 @@ publishing {
                     // intentionally non-transitive and would recreate the
                     // downstream "cannot access Pose" failure.
                     maeDependency.appendNode('scope', 'compile')
+                    def exclusionsNode = maeDependency.appendNode('exclusions')
+                    minecraftProvidedMaeModules.each { provided ->
+                        def exclusionNode = exclusionsNode.appendNode('exclusion')
+                        exclusionNode.appendNode('groupId', provided.group)
+                        exclusionNode.appendNode('artifactId', provided.module)
+                    }
                 }
             }
         }

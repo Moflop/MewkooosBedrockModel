@@ -1,6 +1,6 @@
 # 即时与批量静态网格使用
 
-类型位于 `mods.mewkooo.bedrockmodel.client.mesh`，捕获接口位于 `.capture`。缓存、上传与属性设计见 [本目录说明](README.md)。这些 API 是实验性的客户端优化入口，普通模型渲染不需要依赖它们。
+类型位于 `mods.mewkooo.bedrockmodel.client.mesh`，捕获接口位于 `.capture`。适用范围与限制见 [静态网格使用入口](README.md)。这些 API 是实验性的客户端优化入口，普通模型渲染不需要依赖它们。
 
 ## 调用入口
 
@@ -49,28 +49,3 @@ provider 在本次调用的预算内同步捕获，资源暂不可用返回 fals
 法线保留局部空间，实例矩阵支持旋转和统一缩放；非均匀缩放在捕获期处理并体现在 key 中。资源重载后通过资源 ID 重新取得模型，避免长期持有旧资源。
 
 外观解析前可调用 `supportsInstanceAttributes(light, overlay)` 和 `isOwnerEnabled(owner)`；明确不支持时保持 UNSUPPORTED。关闭某功能使用 `invalidateOwner(owner)`。`preparationStats()` 提供准备、上传、驻留及捕获统计。
-
-历史上的 1.20.1 TaCZ 接入使用 `tacz:external_item_guns`，在第三人称右手、GROUND 和世界内 FIXED 即时绘制，展示枪使用[世界渲染组](world-mesh-rendering.md)。该旧集成说明不是当前版本的真实下游示例；接入方应按当前源码包和所选 LOD 重新实现。
-
-## 构建与检查
-
-```powershell
-./gradlew build --offline
-./gradlew publishToMavenLocal --offline
-```
-
-Maven Local 坐标为 `mods.mewkooo.bedrockmodel:mewkooos_bedrock_model:1.0.0-neoforge-mc1.21.1`。当前仓库未包含 GL 像素读回脚本；上面的 `build` 只验证编译和自动化测试，不代表真实游戏画面或 GPU 路径已验证。
-
-开发客户端的最小画面／性能对照：
-
-```text
-/sbmmesh batch view immediate same 128
-/sbmmesh batch view batched same 128
-/sbmmesh batch start all 128 120 3
-/sbmmesh batch stop
-/sbmmesh attrib view_glow production 24
-/sbmmesh attrib glow 128 1200 10
-/sbmmesh attrib stop
-```
-
-两种测试不能同时运行；保持视角、画质与世界负载不变，先等几何就绪。结果在游戏目录的 `benchmark-results/`；CPU 包含实际提交／排空，GPU elapsed 不等于纯 shader 时间。`/sbmmesh` 仅用于开发环境。

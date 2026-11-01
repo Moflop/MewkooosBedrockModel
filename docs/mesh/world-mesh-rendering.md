@@ -1,6 +1,6 @@
 # 世界网格渲染组使用
 
-类型位于 `mods.mewkooo.bedrockmodel.client.mesh.world`。调用方负责对象有效性、光照采样及几何，库负责遍历、缓存、上传、剔除与绘制；两种策略的组织见[本目录说明](README.md)。这些 API 仅供客户端使用，且仍属实验性。
+类型位于 `mods.mewkooo.bedrockmodel.client.mesh.world`。调用方负责对象有效性、光照采样及几何，库负责遍历、缓存、上传、剔除与绘制；适用范围与限制见[静态网格使用入口](README.md)。这些 API 仅供客户端使用，且仍属实验性。
 
 ## 登记对象
 
@@ -93,19 +93,3 @@ strategy = "AUTO" # AUTO / INSTANCE / SECTION
 ```
 
 `WorldMeshRenderer.stats()`／`group.stats()` 提供全局／组统计，包含对象与缓存数量、策略来源及拒绝原因。
-
-开发环境可对照策略和局部光照：
-
-```text
-/sbmmesh stress same 256
-/sbmmesh path instance
-/sbmmesh path section
-/sbmmesh stats detail
-/sbmmesh stress light start 20 16
-/sbmmesh stress light stop
-/sbmmesh stress clear
-```
-
-path 会启用绘制层。先等 `waitingGeometry=0,dirty=0,pending=0`，再等至少 120 帧记录数据；只改光照时 builds／submittedVertices 应不变，rangeBytes 反映独立 UV2 上传量。frameMs 是最近最多 120 帧的阶段间隔均值，cpuUs 是本层 CPU 时间。
-
-定时光照 start 的参数为 tick 间隔／每轮数量，默认 20 tick／全部实例；stop 保留当前合成光照，reset 恢复生成时采样值。`/sbmmesh cache clear` 保留对象并失效缓存。测试期间固定镜头与世界负载，资源重载、策略切换后重新预热。
