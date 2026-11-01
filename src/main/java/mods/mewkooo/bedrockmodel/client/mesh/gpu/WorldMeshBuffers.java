@@ -37,6 +37,7 @@ public class WorldMeshBuffers {
         int createBuffer();
         void bindArrayBuffer(int id);
         void upload(ByteBuffer data);
+        int bufferSize();
         void deleteBuffer(int id);
     }
 
@@ -48,6 +49,7 @@ public class WorldMeshBuffers {
             // DYNAMIC_DRAW keeps frequently updated light data in storage suited to repeated writes.
             RenderSystem.glBufferData(GL15.GL_ARRAY_BUFFER, buffer, GL15.GL_DYNAMIC_DRAW);
         }
+        @Override public int bufferSize() { return GL15.glGetBufferParameteri(GL15.GL_ARRAY_BUFFER, GL15.GL_BUFFER_SIZE); }
         @Override public void deleteBuffer(int id) { RenderSystem.glDeleteBuffers(id); }
     };
 
@@ -169,6 +171,11 @@ public class WorldMeshBuffers {
         try {
             operations.bindArrayBuffer(id);
             operations.upload(data);
+            // OpenGL reports allocation errors through its error state rather than Java exceptions.
+            // A fresh buffer must contain the entire requested storage before it can be published.
+            if (operations.bufferSize() != data.remaining()) {
+                throw new IllegalStateException("Light buffer upload did not allocate " + data.remaining() + " bytes");
+            }
             metrics.recordLightBufferCreated();
             created = true;
             return id;

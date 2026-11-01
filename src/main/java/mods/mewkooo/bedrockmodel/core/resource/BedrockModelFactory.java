@@ -30,6 +30,10 @@ final class BedrockModelFactory {
         this.legacyModelFactory = legacyModelFactory;
     }
 
+    BedrockModelFactory snapshot() {
+        return new BedrockModelFactory(animationSources.snapshot(), legacyModelFactory);
+    }
+
     Optional<BedrockModelResource> create(ResourceLocation modelId, BedrockModelEntry entry, BedrockModelPOJO pojo) {
         try {
             BedrockModel model = switch (entry.kind()) {

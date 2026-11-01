@@ -22,7 +22,7 @@ public final class BedrockResourceReloadRegistration {
     private BedrockResourceReloadRegistration() {
     }
 
-    /** Registers listeners and installs the query view for the selected logical side. */
+    /** Registers listeners; their completed model generation publishes the logical-side query view. */
     public static void register(Dist dist, LogicalSide logicalSide,
                                 Consumer<PreparableReloadListener> registerListener,
                                 Function<BedrockModelPOJO, ? extends BedrockModel> legacyModelFactory) {

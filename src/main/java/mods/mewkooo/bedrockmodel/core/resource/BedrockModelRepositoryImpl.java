@@ -39,20 +39,23 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
     private final Map<ResourceLocation, BedrockModelEntry> entries;
     private final List<Consumer<Map<ResourceLocation, BedrockModelResource>>> listeners;
     private final BedrockModelFactory modelFactory;
-    private volatile Generation generation = new Generation(Map.of(), Map.of(), null);
+    private final LogicalSide logicalSide;
+    private volatile Generation generation;
 
     private static final class Generation {
         private final ConcurrentMap<ResourceLocation, Optional<BedrockModelPOJO>> pojoCache;
         private final ConcurrentMap<ResourceLocation, Optional<BedrockModelResource>> resourceCache;
         @Nullable
         private final ResourceManager resourceManager;
+        private final BedrockModelFactory modelFactory;
 
         private Generation(Map<ResourceLocation, Optional<BedrockModelPOJO>> pojos,
                            Map<ResourceLocation, Optional<BedrockModelResource>> resources,
-                           @Nullable ResourceManager resourceManager) {
+                           @Nullable ResourceManager resourceManager, BedrockModelFactory modelFactory) {
             this.pojoCache = new ConcurrentHashMap<>(pojos);
             this.resourceCache = new ConcurrentHashMap<>(resources);
             this.resourceManager = resourceManager;
+            this.modelFactory = modelFactory;
         }
     }
 
@@ -64,7 +67,8 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
         this.entries = Map.copyOf(entries);
         this.listeners = List.copyOf(listeners);
         this.modelFactory = new BedrockModelFactory(animationSources, legacyModelFactory);
-        BedrockResources.install(logicalSide, this);
+        this.logicalSide = java.util.Objects.requireNonNull(logicalSide, "logicalSide");
+        this.generation = new Generation(Map.of(), Map.of(), null, modelFactory.snapshot());
     }
 
     @Override
@@ -84,6 +88,7 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
     @Override
     @ParametersAreNonnullByDefault
     protected void apply(Map<ResourceLocation, Optional<BedrockModelPOJO>> prepared, ResourceManager resourceManager, ProfilerFiller profiler) {
+        BedrockModelFactory preparedFactory = modelFactory.snapshot();
         Map<ResourceLocation, Optional<BedrockModelResource>> resources = new ConcurrentHashMap<>();
         entries.forEach((location, entry) -> {
             if (entry.lazy()) {
@@ -93,13 +98,16 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
             if (pojo == null || pojo.isEmpty()) {
                 return;
             }
-            resources.put(location, modelFactory.create(location, entry, pojo.get()));
+            resources.put(location, preparedFactory.create(location, entry, pojo.get()));
         });
         Map<ResourceLocation, BedrockModelResource> listenerResources = resourceMap(resources);
         for (Consumer<Map<ResourceLocation, BedrockModelResource>> listener : listeners) {
             listener.accept(listenerResources);
         }
-        generation = new Generation(prepared, resources, resourceManager);
+        generation = new Generation(prepared, resources, resourceManager, preparedFactory);
+        // Server /reload builds new listener instances. Publish only after their
+        // generation is complete, so readers keep the previous repository while preparing.
+        BedrockResources.install(logicalSide, this);
     }
 
     @Override
@@ -117,7 +125,7 @@ final class BedrockModelRepositoryImpl extends SimplePreparableReloadListener<Ma
         }
         Optional<BedrockModelResource> resource = current.resourceCache.computeIfAbsent(location, key -> {
             BedrockModelPOJO pojo = getModelPojo(current, key, entry);
-            return pojo == null ? Optional.empty() : modelFactory.create(key, entry, pojo);
+            return pojo == null ? Optional.empty() : current.modelFactory.create(key, entry, pojo);
         });
         return resource.orElse(null);
     }

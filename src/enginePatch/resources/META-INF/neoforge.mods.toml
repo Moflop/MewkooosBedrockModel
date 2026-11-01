@@ -1,0 +1,26 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "LGPL-3.0"
+
+[[mods]]
+modId = "sbm_chunk_unload_fix"
+version = "1.0.0+mc1.21.1"
+displayName = "SBM Chunk Unload Compatibility Fix"
+description = '''Optional compatibility fix for stale chunk-unload callbacks in Minecraft 1.21.1 on NeoForge 21.1. Built separately from the Bedrock model library.'''
+
+[[mixins]]
+config = "sbm_chunk_unload_fix.mixins.json"
+
+[[dependencies.sbm_chunk_unload_fix]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,21.2)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.sbm_chunk_unload_fix]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1]"
+ordering = "NONE"
+side = "BOTH"

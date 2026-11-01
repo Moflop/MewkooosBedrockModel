@@ -13,6 +13,36 @@ archivesBaseName = 'mewkooos_bedrock_model'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+// Explicitly selected integration runs keep compile-time compatibility APIs while
+// varying the actual client mods. Normal development and publication are unchanged.
+def clientTestControl = providers.gradleProperty('clientTestControl').map { it.toBoolean() }.getOrElse(false)
+def clientTestEngineFix = providers.gradleProperty('clientTestEngineFix').map { it.toBoolean() }.getOrElse(false)
+def clientTestProfile = providers.gradleProperty('clientTestProfile').orNull ?: (clientTestControl ? 'vanilla' : null)
+def clientTestWorld = providers.gradleProperty('clientTestWorld').getOrElse('sbm-client-test')
+def clientTestDirectory = clientTestProfile == null ? null :
+        (clientTestControl ? "control-${clientTestProfile}" : clientTestProfile) +
+                (clientTestEngineFix ? '-engine-fix' : '')
+def clientTestProfiles = ['vanilla', 'ar', 'sodium', 'sodium-ar', 'embeddium', 'embeddium-ar', 'sodium-ar-iris']
+if (clientTestProfile != null && !clientTestProfiles.contains(clientTestProfile)) {
+    throw new GradleException("Unknown clientTestProfile '${clientTestProfile}': ${clientTestProfiles.join(', ')}")
+}
+
+// A separately compiled control mod lets integration runs exclude the library,
+// its mixins and its test harness entirely while keeping the chosen renderers.
+if (clientTestControl) {
+    sourceSets.create('engineTest')
+    sourceSets.engineTest.java.srcDir 'src/clientDiagnostics/java'
+    configurations.engineTestCompileClasspath.extendsFrom configurations.compileClasspath
+    configurations.engineTestRuntimeClasspath.extendsFrom configurations.runtimeClasspath
+}
+sourceSets.test.java.srcDir 'src/clientDiagnostics/java'
+
+// This optional engine compatibility mod is compiled/packaged independently.
+// It is never part of the library's main output, normal JAR or publication.
+sourceSets.create('enginePatch')
+configurations.enginePatchCompileClasspath.extendsFrom configurations.compileClasspath
+configurations.enginePatchRuntimeClasspath.extendsFrom configurations.runtimeClasspath
+
 neoForge {
     version = project.neo_version
     parchment {
@@ -22,7 +52,12 @@ neoForge {
     runs {
         client {
             client()
+            if (clientTestControl) sourceSet = sourceSets.engineTest
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            if (clientTestProfile != null) {
+                gameDirectory = file("build/client-environment-tests/${clientTestDirectory}/game")
+                programArguments.addAll '--quickPlaySingleplayer', clientTestWorld
+            }
         }
 
         server {
@@ -52,9 +87,20 @@ neoForge {
     }
 
     mods {
-        "${mod_id}" {
-            sourceSet(sourceSets.main)
-            sourceSet(sourceSets.test)
+        if (clientTestControl) {
+            sbm_engine_control {
+                sourceSet(sourceSets.engineTest)
+            }
+        } else {
+            "${mod_id}" {
+                sourceSet(sourceSets.main)
+                sourceSet(sourceSets.test)
+            }
+        }
+        if (clientTestEngineFix) {
+            sbm_chunk_unload_fix {
+                sourceSet(sourceSets.enginePatch)
+            }
         }
     }
 }
@@ -101,7 +147,8 @@ repositories {
 }
 
 dependencies {
-    implementation "maven.modrinth:sodium:mc1.21.1-0.6.13-neoforge"
+    add(clientTestProfile == null ? 'implementation' : 'compileOnly',
+            "maven.modrinth:sodium:mc1.21.1-0.6.13-neoforge")
     compileOnly "maven.modrinth:embeddium:1.0.11+mc1.21.1-neoforge"
     mcLib jarJar("com.maydaymemory:mae:1.1.4") {
         exclude group: 'com.google.code.gson', module: 'gson'
@@ -110,13 +157,29 @@ dependencies {
         exclude group: 'org.joml', module: 'joml'
     }
 
-    implementation "curse.maven:accelerated-rendering-1314021:8437381"
+    add(clientTestProfile == null ? 'implementation' : 'compileOnly',
+            "curse.maven:accelerated-rendering-1314021:8437381")
     api 'org.ow2.asm:asm:9.8'
-    runtimeOnly "curse.maven:configured-457570:7276577"
 
     // 测试用兼容模组：发布时仍保持可选依赖。
-    localRuntime "curse.maven:playeranimator-658587:7389814"
-    localRuntime "maven.modrinth:iris:1.8.12+1.21.1-neoforge"
+    if (clientTestProfile == null) {
+        runtimeOnly "curse.maven:configured-457570:7276577"
+        localRuntime "curse.maven:playeranimator-658587:7389814"
+        localRuntime "maven.modrinth:iris:1.8.12+1.21.1-neoforge"
+    } else {
+        if (clientTestProfile.startsWith('sodium')) {
+            runtimeOnly "maven.modrinth:sodium:mc1.21.1-0.6.13-neoforge"
+        }
+        if (clientTestProfile.startsWith('embeddium')) {
+            runtimeOnly "maven.modrinth:embeddium:1.0.11+mc1.21.1-neoforge"
+        }
+        if (clientTestProfile == 'ar' || clientTestProfile.contains('-ar')) {
+            runtimeOnly "curse.maven:accelerated-rendering-1314021:8437381"
+        }
+        if (clientTestProfile.endsWith('-iris')) {
+            localRuntime "maven.modrinth:iris:1.8.12+1.21.1-neoforge"
+        }
+    }
 
     // Test
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
@@ -127,6 +190,42 @@ dependencies {
 
     // JMH: mocha 原版 (javassist) 用于性能对比
     jmhImplementation 'team.unnamed:mocha:3.0.1'
+}
+
+// testRuntimeClasspath also inherits compileClasspath in this project. Excluding
+// absent renderers here prevents compileOnly compatibility JARs reappearing in
+// an integration client's runtime through the test source set.
+if (clientTestProfile != null) {
+    configurations.matching {
+        it.name in ['runtimeClasspath', 'testRuntimeClasspath', 'additionalRuntimeClasspath']
+    }.configureEach {
+        if (!clientTestProfile.startsWith('sodium')) exclude group: 'maven.modrinth', module: 'sodium'
+        if (!clientTestProfile.startsWith('embeddium')) exclude group: 'maven.modrinth', module: 'embeddium'
+        if (!(clientTestProfile == 'ar' || clientTestProfile.contains('-ar'))) {
+            exclude group: 'curse.maven', module: 'accelerated-rendering-1314021'
+        }
+        if (!clientTestProfile.endsWith('-iris')) exclude group: 'maven.modrinth', module: 'iris'
+    }
+    def runtimeReport = tasks.register('writeClientTestRuntime') {
+        def selectedClasspath = clientTestControl ? configurations.engineTestRuntimeClasspath : configurations.runtimeClasspath
+        def reportFile = layout.buildDirectory.file("client-environment-tests/${clientTestDirectory}/resolved-runtime.json")
+        outputs.file(reportFile)
+        inputs.files(selectedClasspath)
+        inputs.property('engineFix', clientTestEngineFix)
+        inputs.property('profile', clientTestProfile)
+        inputs.property('control', clientTestControl)
+        inputs.property('world', clientTestWorld)
+        doLast {
+            def artifacts = selectedClasspath.resolvedConfiguration.resolvedArtifacts.collect {
+                [coordinate: it.moduleVersion.id.toString(), file: it.file.absolutePath]
+            }.sort { it.coordinate }
+            def report = [profile: clientTestProfile, control: clientTestControl, engineFix: clientTestEngineFix,
+                          world: clientTestWorld, artifacts: artifacts]
+            reportFile.get().asFile.parentFile.mkdirs()
+            reportFile.get().asFile.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(report))
+        }
+    }
+    tasks.named('runClient').configure { dependsOn runtimeReport }
 }
 
 // 用于 neoforge.mods 里替换那一堆 ${xxxx}
@@ -167,6 +266,15 @@ jar {
     exclude 'example/**'
     exclude 'assets/example/**'
     exclude 'data/example/**'
+}
+
+tasks.register('engineUnloadFixJar', Jar) {
+    group = 'build'
+    description = 'Builds the optional, independent Minecraft 1.21.1 / NeoForge 21.1 chunk-unload compatibility mod.'
+    from sourceSets.enginePatch.output
+    archiveBaseName = 'sbm-chunk-unload-fix'
+    archiveVersion = '1.0.0+mc1.21.1'
+    archiveClassifier = ''
 }
 
 // 让 idea 主动下载前置库的源码和 Javadoc

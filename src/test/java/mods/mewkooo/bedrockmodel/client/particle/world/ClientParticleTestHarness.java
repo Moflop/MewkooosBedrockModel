@@ -2,9 +2,13 @@ package mods.mewkooo.bedrockmodel.client.particle.world;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import mods.mewkooo.bedrockmodel.BedrockModelMod;
+import mods.mewkooo.bedrockmodel.client.mesh.gpu.ClientGpuTestScenario;
+import mods.mewkooo.bedrockmodel.client.model.render.ClientRendererTestScenario;
+import mods.mewkooo.bedrockmodel.client.resource.ClientReloadStressScenario;
 import mods.mewkooo.bedrockmodel.core.particle.data.ParticleDescription;
 import mods.mewkooo.bedrockmodel.core.particle.data.ParticleEffectDefinition;
 import mods.mewkooo.bedrockmodel.core.particle.data.component.ParticleLifetimeEvents;
+import mods.mewkooo.bedrockmodel.core.particle.data.component.ParticleLifetimeExpression;
 import mods.mewkooo.bedrockmodel.core.particle.data.component.motion.ParticleMotionCollision;
 import mods.mewkooo.bedrockmodel.core.particle.data.event.SoundEffectEvent;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.EventExecutor;
@@ -13,15 +17,20 @@ import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleEventSink;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleInstance;
 import mods.mewkooo.bedrockmodel.core.particle.runtime.ParticleMolangEnvironment;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.ModList;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.level.LevelEvent;
@@ -33,11 +42,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CompletableFuture;
 
 @EventBusSubscriber(modid = BedrockModelMod.MOD_ID, value = Dist.CLIENT)
 public final class ClientParticleTestHarness {
     private static final String CASE = System.getenv("SBM_CLIENT_TEST");
     private static final int TIMEOUT_TICKS = 600;
+    private static final int TRANSITION_SETTLE_TICKS = Integer.parseInt(
+            System.getenv().getOrDefault("SBM_TRANSITION_SETTLE_TICKS", "60"));
+    private static final int TRANSITION_CYCLES = Integer.parseInt(
+            System.getenv().getOrDefault("SBM_TRANSITION_CYCLES", "1"));
+    private static final int TRANSITION_ORIGIN = Integer.parseInt(
+            System.getenv().getOrDefault("SBM_TRANSITION_ORIGIN", "0"));
 
     private static Stage stage = Stage.WAITING_FOR_WORLD;
     private static int ticks;
@@ -48,6 +64,16 @@ public final class ClientParticleTestHarness {
     private static final Map<BlockPos, BlockState> RESTORE_BLOCKS = new java.util.LinkedHashMap<>();
     private static ParticleEmitterInstance lifecycleEmitter;
     private static ParticleEmitterInstance unloadEmitter;
+    private static final long STARTED_AT = System.nanoTime();
+    private static boolean inTransitionCall;
+    private static ClientLevel departedLevel;
+    private static ParticleEmitterInstance detachedEmitter;
+    private static net.minecraft.resources.ResourceKey<Level> targetDimension;
+    private static CompletableFuture<?> transitionTask;
+    private static int realUnloadEvents;
+    private static int realDimensionChanges;
+    private static int settlingStartTick;
+    private static long lastArrivalNanos;
 
     private ClientParticleTestHarness() {}
 
@@ -57,6 +83,21 @@ public final class ClientParticleTestHarness {
 
         Minecraft minecraft = Minecraft.getInstance();
         try {
+            if (inTransitionCall) return;
+            if (System.nanoTime() - STARTED_AT > java.util.concurrent.TimeUnit.MINUTES.toNanos(10)) {
+                throw new AssertionError("client integration scenario exceeded ten minutes");
+            }
+            if (stage == Stage.WAITING_FOR_EXIT) {
+                if (minecraft.level == null && minecraft.getSingleplayerServer() == null) {
+                    verifyDepartedWorld(minecraft);
+                    check(realDimensionChanges == 2 * TRANSITION_CYCLES, "must complete all real dimension changes");
+                    check(realUnloadEvents >= realDimensionChanges + 1, "must observe real dimension and disconnect unload events");
+                    BedrockModelMod.LOGGER.info("[SBM_CLIENT_TEST] PASS real transitions dimensions={} unloadEvents={}",
+                            realDimensionChanges, realUnloadEvents);
+                    pass(minecraft);
+                }
+                return;
+            }
             if (minecraft.level == null) {
                 if (++ticks > TIMEOUT_TICKS) {
                     fail(minecraft, "timed out waiting for a client world");
@@ -66,10 +107,25 @@ public final class ClientParticleTestHarness {
 
             if (stage == Stage.WAITING_FOR_WORLD) {
                 startTests(minecraft);
+            } else if (stage == Stage.WAITING_FOR_RENDER) {
+                if (ClientRendererTestScenario.tick(minecraft)) {
+                    if ("render".equals(CASE)) pass(minecraft);
+                    else startReload(minecraft);
+                }
+            } else if (stage == Stage.WAITING_FOR_RELOAD) {
+                if (ClientReloadStressScenario.tick(minecraft)) {
+                    ClientReloadStressScenario.close();
+                    if ("reload".equals(CASE)) pass(minecraft);
+                    else {
+                        verifyAnchorRender(minecraft);
+                        startCollisionTest(minecraft);
+                    }
+                }
             } else if (stage == Stage.WAITING_FOR_COLLISION) {
                 if (collisions.get() == 1 && expirations.get() == 1 && collisionEmitter.getParticleCount() == 0) {
                     restoreBlocks(minecraft);
-                    if ("all".equals(CASE)) startLifecycleTest(minecraft);
+                    BedrockModelMod.LOGGER.info("[SBM_CLIENT_TEST] PASS collision and expiration exactly once");
+                    if ("all".equals(CASE) || "environment".equals(CASE)) startLifecycleTest(minecraft);
                     else pass(minecraft);
                 } else if (++ticks > TIMEOUT_TICKS) {
                     fail(minecraft, "collision test timed out: collisions=" + collisions.get()
@@ -91,10 +147,31 @@ public final class ClientParticleTestHarness {
             } else if (stage == Stage.WAITING_FOR_LIFECYCLE_EXPIRATION) {
                 if (lifecycleEmitter.getParticleCount() == 0 && countWorldParticles(minecraft) == 0) {
                     BedrockModelMod.LOGGER.info("[SBM_CLIENT_TEST] PASS clear/restart retain particles until expiration");
-                    if ("all".equals(CASE)) startUnloadTest(minecraft);
+                    if ("environment".equals(CASE)) startRealTransitions(minecraft);
+                    else if ("all".equals(CASE)) startUnloadTest(minecraft);
                     else pass(minecraft);
                 } else if (++ticks > 80) {
                     fail(minecraft, "externally managed particle did not release at its lifetime");
+                }
+            } else if (stage == Stage.WAITING_FOR_TRANSITION_PARTICLES) {
+                if (countWorldParticles(minecraft) == 2) requestDimensionOrExit(minecraft);
+                else if (++ticks > TIMEOUT_TICKS) throw new AssertionError("transition particles were not added");
+            } else if (stage == Stage.WAITING_FOR_DIMENSION) {
+                if (transitionTask.isDone()) transitionTask.join();
+                if (minecraft.level != departedLevel && minecraft.level.dimension().equals(targetDimension)
+                        && minecraft.player != null && minecraft.screen == null) {
+                    verifyDepartedWorld(minecraft);
+                    realDimensionChanges++;
+                    lastArrivalNanos = System.nanoTime();
+                    BedrockModelMod.LOGGER.info("[SBM_CLIENT_TEST] PASS dimension {} ownership released", targetDimension.location());
+                    settlingStartTick = minecraft.getSingleplayerServer().getTickCount();
+                    stage = Stage.WAITING_FOR_WORLD_SETTLE;
+                } else if (++ticks > 2400) throw new AssertionError("real dimension change timed out");
+            } else if (stage == Stage.WAITING_FOR_WORLD_SETTLE) {
+                int elapsed = minecraft.getSingleplayerServer().getTickCount() - settlingStartTick;
+                if (elapsed >= TRANSITION_SETTLE_TICKS && minecraft.screen == null && minecraft.getOverlay() == null) {
+                    BedrockModelMod.LOGGER.info("[SBM_CLIENT_TEST] dimension settled for {} server ticks", elapsed);
+                    prepareTransitionParticles(minecraft);
                 }
             }
         } catch (Throwable failure) {
@@ -105,6 +182,29 @@ public final class ClientParticleTestHarness {
 
     private static void startTests(Minecraft minecraft) {
         ticks = 0;
+        BedrockModelMod.LOGGER.info("[SBM_CLIENT_TEST] RUN {} profile={} scenario={}",
+                System.getenv("SBM_CLIENT_RUN_ID"), System.getenv("SBM_CLIENT_PROFILE"), CASE);
+        if ("environment".equals(CASE)) {
+            verifyProfile();
+            ClientGpuTestScenario.run();
+            ClientRendererTestScenario.start(minecraft);
+            stage = Stage.WAITING_FOR_RENDER;
+            return;
+        } else if ("gpu".equals(CASE)) {
+            ClientGpuTestScenario.run();
+            pass(minecraft);
+            return;
+        } else if ("render".equals(CASE)) {
+            ClientRendererTestScenario.start(minecraft);
+            stage = Stage.WAITING_FOR_RENDER;
+            return;
+        } else if ("reload".equals(CASE)) {
+            startReload(minecraft);
+            return;
+        } else if ("transitions".equals(CASE)) {
+            startRealTransitions(minecraft);
+            return;
+        }
         if ("anchor".equals(CASE) || "all".equals(CASE)) {
             verifyAnchorRender(minecraft);
         }
@@ -119,6 +219,109 @@ public final class ClientParticleTestHarness {
         } else {
             throw new IllegalArgumentException("Unknown SBM_CLIENT_TEST case: " + CASE);
         }
+    }
+
+    private static void startReload(Minecraft minecraft) {
+        ClientReloadStressScenario.start(minecraft);
+        stage = Stage.WAITING_FOR_RELOAD;
+        ticks = 0;
+    }
+
+    private static void verifyProfile() {
+        String profile = System.getenv("SBM_CLIENT_PROFILE");
+        check(profile != null, "environment test needs SBM_CLIENT_PROFILE");
+        check(ModList.get().isLoaded("sbm_chunk_unload_fix") == Boolean.parseBoolean(
+                        System.getenv("SBM_CLIENT_ENGINE_FIX")), "unexpected engine fix mod presence");
+        for (String mod : List.of("sodium", "embeddium", "acceleratedrendering", "iris")) {
+            boolean expected = switch (mod) {
+                case "acceleratedrendering" -> profile.equals("ar") || profile.contains("-ar");
+                default -> profile.contains(mod);
+            };
+            check(ModList.get().isLoaded(mod) == expected, "unexpected mod presence: " + mod + " in " + profile);
+        }
+        ModList.get().getMods().forEach(mod -> BedrockModelMod.LOGGER.info(
+                "[SBM_CLIENT_TEST] MOD {} {}", mod.getModId(), mod.getVersion()));
+    }
+
+    @SubscribeEvent
+    public static void observeUnload(LevelEvent.Unload event) {
+        if (CASE != null && !completed && event.getLevel() instanceof ClientLevel) realUnloadEvents++;
+    }
+
+    private static void startRealTransitions(Minecraft minecraft) {
+        if ("transitions".equals(CASE)) verifyProfile();
+        check(minecraft.getSingleplayerServer() != null, "real transitions need the copied singleplayer world");
+        check(TRANSITION_SETTLE_TICKS >= 0 && TRANSITION_CYCLES > 0 && TRANSITION_CYCLES <= 10,
+                "invalid transition test configuration");
+        BedrockModelMod.LOGGER.info("[SBM_CLIENT_TEST] transitions settleTicks={} cycles={} origin={}",
+                TRANSITION_SETTLE_TICKS, TRANSITION_CYCLES, TRANSITION_ORIGIN);
+        realDimensionChanges = 0;
+        realUnloadEvents = 0;
+        prepareTransitionParticles(minecraft);
+    }
+
+    private static void prepareTransitionParticles(Minecraft minecraft) {
+        departedLevel = minecraft.level;
+        var manager = WorldEmitterManager.getInstance();
+        Vec3 position = minecraft.player.position().add(0, 2, 0);
+        var definition = definition(false);
+        List<mods.mewkooo.bedrockmodel.core.particle.data.component.IComponent> components = List.of(
+                new ParticleLifetimeExpression(new ParticleMolangEnvironment().compile("1200"), null));
+        var longLived = new ParticleEffectDefinition(definition.getIdentifier(), definition.getDescription(), components,
+                definition.getCurves(), definition.getEvents());
+        detachedEmitter = manager.addEmitter(minecraft.level, position, Vec3.ZERO, longLived);
+        check(detachedEmitter != null, "detached transition emitter must exist");
+        detachedEmitter.spawnParticle();
+        manager.clear();
+        unloadEmitter = manager.addEmitter(minecraft.level, position, Vec3.ZERO, longLived);
+        check(unloadEmitter != null, "active transition emitter must exist");
+        unloadEmitter.spawnParticle();
+        check(detachedEmitter.getParticleCount() == 1 && unloadEmitter.getParticleCount() == 1,
+                "both active and cleared emitters must own a particle before transition");
+        ticks = 0;
+        stage = Stage.WAITING_FOR_TRANSITION_PARTICLES;
+    }
+
+    private static void requestDimensionOrExit(Minecraft minecraft) {
+        if (realDimensionChanges > 0) {
+            BedrockModelMod.LOGGER.info("[SBM_CLIENT_TEST] transition departure arrivalAgeMs={} serverTicks={}",
+                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lastArrivalNanos),
+                    minecraft.getSingleplayerServer().getTickCount() - settlingStartTick);
+        }
+        if (realDimensionChanges == 2 * TRANSITION_CYCLES) {
+            stage = Stage.WAITING_FOR_EXIT;
+            inTransitionCall = true;
+            try {
+                mods.sbmtest.ChunkUnloadDiagnostics.arm(minecraft.getSingleplayerServer());
+                minecraft.level.disconnect();
+                minecraft.disconnect(new TitleScreen());
+            } finally {
+                inTransitionCall = false;
+            }
+            return;
+        }
+        targetDimension = minecraft.level.dimension().equals(Level.NETHER) ? Level.OVERWORLD : Level.NETHER;
+        var server = minecraft.getSingleplayerServer();
+        var playerId = minecraft.player.getUUID();
+        stage = Stage.WAITING_FOR_DIMENSION;
+        ticks = 0;
+        transitionTask = server.submit(() -> {
+            var player = server.getPlayerList().getPlayer(playerId);
+            check(player != null, "integrated server player must exist");
+            player.setGameMode(GameType.SPECTATOR);
+            var destination = server.getLevel(targetDimension);
+            check(destination != null, "destination dimension must exist");
+            double coordinate = TRANSITION_ORIGIN + 0.5;
+            player.teleportTo(destination, coordinate, 90, coordinate, 0, 0);
+            mods.sbmtest.ChunkUnloadDiagnostics.arm(server);
+        });
+    }
+
+    private static void verifyDepartedWorld(Minecraft minecraft) {
+        check(detachedEmitter.getParticleCount() == 0, "cleared emitter must release old-world ownership");
+        check(unloadEmitter.getParticleCount() == 0, "active emitter must release old-world ownership");
+        check(WorldEmitterManager.getInstance().getEmitterCount() == 0, "old-world emitters must be removed");
+        check(countWorldParticles(minecraft) == 0, "old-world particles must be absent from ParticleEngine");
     }
 
     private static void startCollisionTest(Minecraft minecraft) {
@@ -307,6 +510,7 @@ public final class ClientParticleTestHarness {
     }
 
     private static void pass(Minecraft minecraft) {
+        ClientReloadStressScenario.close();
         completed = true;
         BedrockModelMod.LOGGER.info("[SBM_CLIENT_TEST] PASS {}", CASE);
         minecraft.stop();
@@ -315,6 +519,7 @@ public final class ClientParticleTestHarness {
     private static void fail(Minecraft minecraft, String message) {
         if (completed) return;
         completed = true;
+        ClientReloadStressScenario.close();
         if (minecraft.level != null) restoreBlocks(minecraft);
         BedrockModelMod.LOGGER.error("[SBM_CLIENT_TEST] FAIL {}: {}", CASE, message);
         minecraft.stop();
@@ -329,6 +534,8 @@ public final class ClientParticleTestHarness {
         WAITING_FOR_COLLISION,
         WAITING_FOR_LIFECYCLE_PARTICLE,
         WAITING_FOR_LIFECYCLE_EXPIRATION,
-        WAITING_FOR_UNLOAD_PARTICLE
+        WAITING_FOR_UNLOAD_PARTICLE,
+        WAITING_FOR_RENDER, WAITING_FOR_RELOAD, WAITING_FOR_TRANSITION_PARTICLES,
+        WAITING_FOR_DIMENSION, WAITING_FOR_WORLD_SETTLE, WAITING_FOR_EXIT
     }
 }

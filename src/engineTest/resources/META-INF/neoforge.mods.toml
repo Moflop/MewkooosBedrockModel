@@ -1,0 +1,23 @@
+modLoader = "javafml"
+loaderVersion = "${loader_version_range}"
+license = "All Rights Reserved"
+
+[[mods]]
+modId = "sbm_engine_control"
+version = "1.0"
+displayName = "SBM engine transition control"
+description = '''Independent Minecraft/NeoForge transition control, with the Bedrock model library absent.'''
+
+[[dependencies.sbm_engine_control]]
+modId = "neoforge"
+type = "required"
+versionRange = "${neo_version_range}"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.sbm_engine_control]]
+modId = "minecraft"
+type = "required"
+versionRange = "${minecraft_version_range}"
+ordering = "NONE"
+side = "BOTH"

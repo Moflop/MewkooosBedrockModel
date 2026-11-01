@@ -39,6 +39,13 @@ final class BedrockAnimationSourceRepository extends SimplePreparableReloadListe
         this.processors = Map.copyOf(processors);
     }
 
+    /** Captures the resource manager and lazy cache used by one model generation. */
+    BedrockAnimationSourceRepository snapshot() {
+        BedrockAnimationSourceRepository snapshot = new BedrockAnimationSourceRepository(processors);
+        snapshot.generation = generation;
+        return snapshot;
+    }
+
     @Override
     @NotNull
     @ParametersAreNonnullByDefault

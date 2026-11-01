@@ -9,8 +9,8 @@ import java.util.Objects;
 /**
  * Entry point for querying the library's current resource generation.
  *
- * <p>The library installs the implementation while it assembles reload
- * listeners.  Consumers only need this class and the contracts in
+ * <p>The library publishes the implementation after its first resource generation
+ * is applied successfully. Consumers only need this class and the contracts in
  * {@code api.resource}; no {@code core.resource} class is required.</p>
  */
 public final class BedrockResources {
@@ -22,8 +22,10 @@ public final class BedrockResources {
 
     /**
      * Returns the current model view for a logical side, or {@code null}
-     * before that side's reload listener has been installed. A physical client
+     * before that side's first resource generation has been published. A physical client
      * may have both a client-resource view and an integrated-server view.
+     * A replacement reload listener keeps the previous view published until its
+     * complete generation and resource callbacks have been applied successfully.
      */
     @Nullable
     public static BedrockModelAccess models(LogicalSide side) {
@@ -32,7 +34,7 @@ public final class BedrockResources {
     }
 
     /**
-     * Installs the view used by the reload bootstrap.
+     * Publishes the completed view used by the reload bootstrap.
      *
      * <p>This method is public so the core bootstrap can remain an implementation
      * package.  Downstream mods should only read {@link #models(LogicalSide)}.</p>
