@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -61,7 +61,7 @@ class ServerModelResourcesTest {
             var loader = RawResourceLoaders.forLogicalSide(LogicalSide.SERVER);
             var animationSources = new BedrockAnimationSourceRepository(Map.of(ID,
                     new BedrockAnimationEntry(loader,
-                            (file, model) -> new ArrayList<>(BedrockAnimation.createAnimation(file, model)), false)));
+                            (file, model) -> new LinkedHashMap<>(BedrockAnimation.createAnimationsByName(file, model)), false)));
             var repository = new BedrockModelRepositoryImpl(LogicalSide.SERVER,
                     Map.of(ID, new BedrockModelEntry(loader, ID, kind,
                             BedrockModelBakeContext::optionsFromAnimations, List.of(ID), false)),
@@ -79,6 +79,11 @@ class ServerModelResourcesTest {
             assertTrue(resource.model().getIndex("root") >= 0, kind + " must keep the animated bone");
             assertEquals(1, resource.getAnimations(ID).size());
             assertNotNull(resource.getAnimations(ID).getFirst().evaluate(0));
+            assertSame(resource.getAnimations(ID).getFirst(), resource.getAnimation(ID, "animation.test"));
+            assertSame(resource.getAnimation(ID, "animation.test"),
+                    BedrockResources.models(LogicalSide.SERVER).getAnimation(ID, ID, "animation.test"));
+            assertNull(resource.getAnimation(ID, "animation.missing"));
+            assertNull(BedrockResources.models(LogicalSide.SERVER).getAnimation(ID, ID, "animation.missing"));
         }
     }
 

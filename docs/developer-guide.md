@@ -88,7 +88,6 @@ import mods.mewkooo.bedrockmodel.api.resource.BedrockResources;
 import mods.mewkooo.bedrockmodel.client.model.render.BedrockModelRenderer;
 import net.neoforged.fml.LogicalSide;
 import net.minecraft.resources.ResourceLocation;
-import java.util.List;
 
 public final class ExampleRenderer {
     public static void render(PoseStack poseStack, VertexConsumer vertexConsumer,
@@ -100,11 +99,11 @@ public final class ExampleRenderer {
         BedrockModelResource resource = access.getResource(modelId);
         if (resource != null && resource.model() instanceof AnimatedBedrockModel model) {
             BedrockModelInstance instance = model.createInstance();
-            List<AnimationClip> clips = access.getAnimations(modelId, animationId);
-            if (clips != null && !clips.isEmpty()) {
+            AnimationClip clip = resource.getAnimation(animationId, "animation.drone.walk");
+            if (clip != null) {
                 // timeSeconds 由实体或动画状态机维护；库不自动推进时间。
                 instance.resetPose();
-                instance.applyPose(clips.get(0).evaluate(timeSeconds));
+                instance.applyPose(clip.evaluate(timeSeconds));
             }
             BedrockModelRenderer.render(instance, poseStack, vertexConsumer, packedLight, packedOverlay);
         }
@@ -113,6 +112,10 @@ public final class ExampleRenderer {
 ```
 
 `BedrockResources.models(LogicalSide.CLIENT)` 只提供客户端当前重载世代的只读查询；服务端逻辑使用 `models(LogicalSide.SERVER)`。资源读取、缓存和模型构造由内部 `core.resource` 完成。`BedrockModelResource.model()` 是 `api.model.BedrockModel`，可动画模型实现 `AnimatedBedrockModel` 并创建 `BedrockModelInstance`。动画混合、播放状态、声音/粒子副作用和渲染线程调度由接入方负责。模型对象和实例可能在下一次资源重载后失效，重载回调中应重新按 ID 获取。
+
+按名称查询可使用 `resource.getAnimation(animationId, "animation.drone.walk")`，或仓库的便捷方法 `access.getAnimation(modelId, animationId, "animation.drone.walk")`。动画文件 ID 与文件内的完整动画名是两个不同的键；名称区分大小写。库在构建模型资源时直接保留 JSON 的名称映射，查询不会遍历片段列表；模型、文件或名称不可用时返回 `null`。每份模型资源持有自己的只读索引，资源重载后重新获取资源和片段，播放器可在初始化时缓存片段引用。
+
+原有 `getAnimations(...)`、`getAllAnimations()`、`animations()` 和两参数构造器继续保留。手动构建具名资源时使用 `BedrockModelResource.fromNamedAnimations(model, Map.of(animationId, Map.of("animation.drone.walk", clip)))`；名称由 Map 的键提供，自定义 `AnimationClip` 无需实现 `getName()`。两参数构造器只接收片段列表，无法推导名称，因此其按名称查询返回 `null`。`BedrockModelResource` 新增了 `animationsByName` record 组件；直接依赖 record 解构、组件反射或默认 `equals` / `hashCode` / `toString` 结构的代码需相应调整。
 
 TREE 和 BAKED 骨骼的法线变换使用局部位置变换线性部分的逆转置，逐层组合父骨骼变换，支持非均匀缩放和负缩放；普通顶点写入与加速后端共用该法线矩阵。零缩放等奇异变换不存在逆矩阵：若局部逆转置不可用或产生非有限值，则该骨骼的局部法线贡献回退为单位矩阵，保留传入的父级法线矩阵，位置仍按原变换处理。`getGlobalNormal()` 则对整个全局变换求逆转置，失败时返回单位矩阵。奇异姿态下两者只保证有限的法线回退值，不保证退化面的光照方向。
 

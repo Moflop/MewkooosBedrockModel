@@ -9,7 +9,6 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.LogicalSide;
 import net.neoforged.fml.ModLoader;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -36,7 +35,7 @@ public final class BedrockResourceReloadRegistration {
         Map<ResourceLocation, BedrockAnimationEntry> animations = new LinkedHashMap<>();
         event.getAnimationRegistry().forEach((id, registration) -> animations.put(id,
                 new BedrockAnimationEntry(registration.rawLoader(),
-                        (file, model) -> new ArrayList<>(BedrockAnimation.createAnimation(file, model)),
+                        (file, model) -> new LinkedHashMap<>(BedrockAnimation.createAnimationsByName(file, model)),
                         registration.lazy())));
         Map<ResourceLocation, BedrockModelEntry> models = new LinkedHashMap<>();
         event.getModelRegistry().forEach((id, registration) -> models.put(id, new BedrockModelEntry(

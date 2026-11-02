@@ -27,7 +27,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +40,9 @@ import java.util.zip.ZipOutputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -65,11 +68,16 @@ class LazyResourceGenerationTest {
         // Only the independent animation reload listener has applied the next generation.
         fixture.animations.apply(fixture.animations.prepare(newResources, InactiveProfiler.INSTANCE),
                 newResources, InactiveProfiler.INSTANCE);
-        assertGeneration(fixture.models.getResource(MODEL_ID), "old_root", 1);
+        var oldResource = fixture.models.getResource(MODEL_ID);
+        assertGeneration(oldResource, "old_root", 1);
 
         fixture.models.apply(fixture.models.prepare(newResources, InactiveProfiler.INSTANCE),
                 newResources, InactiveProfiler.INSTANCE);
-        assertGeneration(fixture.models.getResource(MODEL_ID), "new_root", 9);
+        var newResource = fixture.models.getResource(MODEL_ID);
+        assertGeneration(newResource, "new_root", 9);
+        assertNotSame(oldResource.getAnimation(ANIMATION_ID, "animation.generation"),
+                newResource.getAnimation(ANIMATION_ID, "animation.generation"));
+        assertGeneration(oldResource, "old_root", 1);
     }
 
     @ParameterizedTest
@@ -129,7 +137,7 @@ class LazyResourceGenerationTest {
         var loader = RawResourceLoaders.forLogicalSide(LogicalSide.SERVER);
         var animations = new BedrockAnimationSourceRepository(Map.of(ANIMATION_ID,
                 new BedrockAnimationEntry(loader,
-                        (file, model) -> new ArrayList<>(BedrockAnimation.createAnimation(file, model)), lazyAnimation)));
+                        (file, model) -> new LinkedHashMap<>(BedrockAnimation.createAnimationsByName(file, model)), lazyAnimation)));
         AtomicBoolean failModels = new AtomicBoolean();
         var models = new BedrockModelRepositoryImpl(LogicalSide.SERVER,
                 Map.of(MODEL_ID, new BedrockModelEntry(loader, MODEL_ID, kind,
@@ -153,7 +161,11 @@ class LazyResourceGenerationTest {
         var clips = resource.getAnimations(ANIMATION_ID);
         assertNotNull(clips);
         assertEquals(1, clips.size());
-        assertEquals(duration, clips.getFirst().getSpecifiedEndTimeS(),
+        var namedClip = resource.getAnimation(ANIMATION_ID, "animation.generation");
+        assertNotNull(namedClip);
+        assertSame(clips.getFirst(), namedClip);
+        assertNull(resource.getAnimation(ANIMATION_ID, "animation.missing"));
+        assertEquals(duration, namedClip.getSpecifiedEndTimeS(),
                 "lazy animation bytes must belong to the same generation as lazy model bytes");
         assertTrue(resource.model().getIndex(bone) >= 0, "the matching animated model bone must remain available");
         assertTrue(clips.getFirst().evaluate(0).getBoneTransforms().iterator().hasNext(),

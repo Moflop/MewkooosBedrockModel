@@ -44,7 +44,7 @@ final class BedrockModelFactory {
                 case BAKED -> createBakedModel(modelId, entry, pojo);
                 case TREE -> TreeBedrockModel.bake(pojo);
             };
-            return Optional.of(new BedrockModelResource(model, createAnimations(entry, model)));
+            return Optional.of(BedrockModelResource.fromNamedAnimations(model, createAnimations(entry, model)));
         } catch (RuntimeException e) {
             BedrockModelMod.LOGGER.error("Failed to create Bedrock model resource: {}", modelId, e);
             return Optional.empty();
@@ -91,11 +91,11 @@ final class BedrockModelFactory {
         return files;
     }
 
-    private Map<ResourceLocation, List<AnimationClip>> createAnimations(BedrockModelEntry entry, BedrockModel model) {
+    private Map<ResourceLocation, Map<String, AnimationClip>> createAnimations(BedrockModelEntry entry, BedrockModel model) {
         if (entry.animationSourceIds().isEmpty()) {
             return Map.of();
         }
-        Map<ResourceLocation, List<AnimationClip>> animations = new LinkedHashMap<>();
+        Map<ResourceLocation, Map<String, AnimationClip>> animations = new LinkedHashMap<>();
         for (ResourceLocation animationId : entry.animationSourceIds()) {
             BedrockAnimationEntry animationEntry = animationSources.getProcessor(animationId);
             if (animationEntry == null) {
@@ -105,7 +105,7 @@ final class BedrockModelFactory {
             if (file == null) {
                 continue;
             }
-            List<AnimationClip> created = animationEntry.factory().create(file, model);
+            Map<String, AnimationClip> created = animationEntry.factory().create(file, model);
             if (created != null) {
                 animations.put(animationId, created);
             }

@@ -27,6 +27,13 @@ public interface BedrockModelAccess {
         return resource == null ? null : resource.getAnimations(animationId);
     }
 
+    /** Returns a clip by its exact file-local name, or {@code null} when unavailable. */
+    @Nullable
+    default AnimationClip getAnimation(ResourceLocation modelId, ResourceLocation animationId, String animationName) {
+        BedrockModelResource resource = getResource(modelId);
+        return resource == null ? null : resource.getAnimation(animationId, animationName);
+    }
+
     /** Returns the resources loaded in the current reload generation. */
     Map<ResourceLocation, BedrockModelResource> getAllResources();
 }

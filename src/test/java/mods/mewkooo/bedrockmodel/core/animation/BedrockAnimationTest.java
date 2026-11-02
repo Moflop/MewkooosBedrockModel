@@ -9,9 +9,13 @@ import mods.mewkooo.bedrockmodel.api.model.ModelType;
 import mods.mewkooo.bedrockmodel.api.model.display.ItemDisplayTransforms;
 import mods.mewkooo.bedrockmodel.core.json.GsonUtil;
 import mods.mewkooo.bedrockmodel.core.json.pojo.BedrockAnimationFile;
+import mods.mewkooo.bedrockmodel.core.molang.context.MolangEngineHelper;
 import mods.mewkooo.bedrockmodel.core.molang.runtime.MolangContext;
 import net.minecraft.world.phys.AABB;
 import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,6 +26,43 @@ class BedrockAnimationTest {
         @Override public AABB getRenderBoundingBox() { return null; }
         @Override public ItemDisplayTransforms getItemDisplayTransforms() { return ItemDisplayTransforms.NONE; }
     };
+
+    @Test
+    void namedFactoryPreservesSourceNamesAndClipOrder() {
+        BedrockAnimationFile file = GsonUtil.CLIENT_GSON.fromJson("""
+                {"animations":{
+                  "animation.idle":{"animation_length":1},
+                  "animation.walk":{"animation_length":2,
+                    "bones":{"root":{"position":[0,"query.anim_time",0]}}}
+                }}
+                """, BedrockAnimationFile.class);
+
+        var animations = BedrockAnimation.createAnimationsByName(file, ROOT_MODEL);
+        assertEquals(List.of("animation.idle", "animation.walk"), new ArrayList<>(animations.keySet()));
+        assertEquals("animation.idle", animations.get("animation.idle").getName());
+        assertEquals(1, animations.get("animation.idle").getSpecifiedEndTimeS());
+        assertEquals(2, animations.get("animation.walk").getSpecifiedEndTimeS());
+        assertEquals(0.5f, onlyTransform(animations.get("animation.walk").evaluate(0.5f)).translation().y(), 1.0e-5f);
+
+        var engine = MolangEngineHelper.createEngine(new MolangContext<>());
+        var explicitEngineAnimations = BedrockAnimation.createAnimationsByName(file, ROOT_MODEL, engine);
+        assertEquals(0.25f, onlyTransform(explicitEngineAnimations.get("animation.walk").evaluate(0.25f)).translation().y(),
+                1.0e-5f);
+        var legacyAnimations = BedrockAnimation.createAnimation(file, ROOT_MODEL);
+        assertEquals(List.of("animation.idle", "animation.walk"),
+                legacyAnimations.stream().map(BedrockAnimation::getName).toList());
+    }
+
+    @Test
+    void namedAndListFactoriesHandleMissingAndEmptyAnimations() {
+        for (String json : List.of("{}", "{\"animations\":{}}")) {
+            BedrockAnimationFile file = GsonUtil.CLIENT_GSON.fromJson(json, BedrockAnimationFile.class);
+            assertTrue(BedrockAnimation.createAnimationsByName(file, ROOT_MODEL).isEmpty());
+            assertTrue(BedrockAnimation.createAnimationsByName(file, ROOT_MODEL, null).isEmpty());
+            assertTrue(BedrockAnimation.createAnimation(file, ROOT_MODEL).isEmpty());
+            assertTrue(BedrockAnimation.createAnimation(file, ROOT_MODEL, null).isEmpty());
+        }
+    }
 
     @Test
     void defaultFactoryCompilesAndEvaluatesMolangTime() {

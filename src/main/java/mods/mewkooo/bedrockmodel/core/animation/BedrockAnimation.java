@@ -20,6 +20,7 @@ import org.joml.Vector3fc;
 
 import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -123,10 +124,22 @@ public class BedrockAnimation extends BasicAnimation implements AnimationClip {
     public static List<BedrockAnimation> createAnimation(BedrockAnimationFile pojo,
                                                           @Nullable BedrockModel indexProvider,
                                                           @Nullable MochaEngine<?> molangEngine) {
-        List<BedrockAnimation> animations = new ArrayList<>();
+        return new ArrayList<>(createAnimationsByName(pojo, indexProvider, molangEngine).values());
+    }
+
+    /** Creates model-bound clips indexed by their names in the source animation file. */
+    public static Map<String, BedrockAnimation> createAnimationsByName(BedrockAnimationFile pojo,
+                                                                      @Nullable BedrockModel indexProvider) {
+        return createAnimationsByName(pojo, indexProvider, MolangEngineHelper.createEngine(new MolangContext<>()));
+    }
+
+    public static Map<String, BedrockAnimation> createAnimationsByName(BedrockAnimationFile pojo,
+                                                                      @Nullable BedrockModel indexProvider,
+                                                                      @Nullable MochaEngine<?> molangEngine) {
+        Map<String, BedrockAnimation> animations = new LinkedHashMap<>();
         if (pojo.getAnimations() != null) {
             for (Map.Entry<String, BedrockAnimationPOJO> entry : pojo.getAnimations().entrySet()) {
-                animations.add(createAnimation(entry.getKey(), entry.getValue(), indexProvider, molangEngine));
+                animations.put(entry.getKey(), createAnimation(entry.getKey(), entry.getValue(), indexProvider, molangEngine));
             }
         }
         return animations;
